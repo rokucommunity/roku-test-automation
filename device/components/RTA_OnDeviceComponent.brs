@@ -869,117 +869,6 @@ function processIsSubtypeRequest(request) as Object
 	}
 end function
 
-function processStoreNodeReferencesRequest(request as Object) as Object
-	args = request.args
-	nodeRefKey = args.nodeRefKey
-
-	includeArrayGridChildren = RTA_getBooleanAtKeyPath(args, "includeArrayGridChildren")
-	includeNodeCountInfo = RTA_getBooleanAtKeyPath(args, "includeNodeCountInfo")
-	includeBoundingRectInfo = RTA_getBooleanAtKeyPath(args, "includeBoundingRectInfo")
-
-	if NOT RTA_isNonEmptyString(nodeRefKey) then
-		return RTA_buildErrorResponseObject("Invalid value supplied for 'nodeRefKey' param")
-	end if
-
-	storedNodes = []
-	' Clear out old nodes before getting next retrieval of nodes
-	m.nodeReferences[nodeRefKey] = storedNodes
-	flatTree = []
-
-	arrayGridNodes = {}
-	scene = m.top.getScene()
-	buildTree(storedNodes, flatTree, scene, includeArrayGridChildren, arrayGridNodes)
-
-	result = {
-		"flatTree": flatTree
-	}
-
-	arrayGridComponents = {}
-	nodeCountByType = {}
-	itemComponentNodes = []
-
-	if includeArrayGridChildren OR includeNodeCountInfo then
-		if includeArrayGridChildren then
-			for each key in arrayGridNodes
-				node = arrayGridNodes[key]
-				componentName = node.itemComponentName
-				if RTA_isString(componentName) then
-					arrayGridComponents[componentName] = true
-				else if RTA_isString(node.channelInfoComponentName) then
-					componentName = node.channelInfoComponentName
-					arrayGridComponents[componentName] = true
-				end if
-			end for
-		end if
-
-		allNodes = m.top.getAll()
-		result["totalNodes"] = allNodes.count()
-		for each node in allNodes
-			nodeType = node.subtype()
-			if nodeCountByType[nodeType] = Invalid then
-				nodeCountByType[nodeType] = 0
-			end if
-			nodeCountByType[nodeType]++
-
-			if includeArrayGridChildren AND arrayGridComponents[nodeType] = true then
-				itemComponentNodes.push(node)
-			end if
-		end for
-
-		if includeArrayGridChildren then
-			buildItemComponentTrees(storedNodes, flatTree, itemComponentNodes, arrayGridNodes, allNodes, includeBoundingRectInfo)
-		end if
-
-		result["nodeCountByType"] = nodeCountByType
-	end if
-
-	if includeBoundingRectInfo then
-		for each nodeTree in flatTree
-			' We use the visible field we added to only calculate rect if this is a RenderableNode.
-			if nodeTree.visible <> Invalid then
-				node = storedNodes[nodeTree.ref]
-
-				if arrayGridComponents[nodeTree.subtype] = true then
-					' We need to get rect differently for our arrayGridComponents as the x and y are often wrong if we called sceneBoundingRect on the ArrayGrid component itself
-					parentTree = flatTree[nodeTree.parentRef]
-					itemIndex = [nodeTree.position.toStr()]
-
-					' We need to build our properly formatted itemNumber string by walking up the parents until we get to the outer ArrayGrid parent. We can't use the inner MarkupGrid as this gives incorrect results sometimes as well.
-					while parentTree <> Invalid
-						if parentTree.subtype = "RowListItem" then
-							itemIndex.unshift(parentTree.position.toStr())
-						else if parentTree.sequestered <> true then
-							' Once we hit our first non sequestered parent we know we've hit our parent ArrayGrid
-							itemNumber = "item" + itemIndex[0]
-							if itemIndex.count() = 2 then
-								itemNumber += "_" + itemIndex[1]
-							end if
-							' For debugging
-							' nodeTree["itemNumber"] = itemNumber
-							nodeTree["sceneRect"] = storedNodes[parentTree.ref].sceneSubBoundingRect(itemNumber)
-							exit while
-						end if
-
-						parentTree = flatTree[parentTree.parentRef]
-					end while
-				else if nodeTree.rect = Invalid AND nodeTree.sceneRect = Invalid AND nodeTree.sequestered <> true then
-					' We don't want to try and get rects for sequestered nodes as those values are often wrong.
-					nodeTree["sceneRect"] = node.sceneBoundingRect()
-				end if
-			end if
-		end for
-
-		if m.currentDesignResolution = invalid then
-			m.currentDesignResolution = scene.currentDesignResolution
-		end if
-		result["currentDesignResolution"] = m.currentDesignResolution
-	end if
-
-	m.nodeReferences[nodeRefKey] = storedNodes
-
-	return result
-end function
-
 function processAssignElementIdOnAllNodesRequest(request as Object) as Object
 	args = request.args
 
@@ -1004,6 +893,517 @@ function processAssignElementIdOnAllNodesRequest(request as Object) as Object
 	return result
 end function
 
+' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
+function addNodeToTree(storedNodes as Object, flatTree as Object, node as Object, parentRef = -1 as Integer, position = -1 as Integer, sequestered = false as Boolean) as Object
+	currentNodeReference = storedNodes.count()
+	storedNodes.push(node)
+
+	nodeSubtype = node.subtype()
+	nodeBranch = {
+		"subtype": nodeSubtype
+		"id": node.id
+		"ref": currentNodeReference
+		"parentRef": parentRef
+		"position": position
+	}
+
+	if sequestered then
+		nodeBranch.sequestered = true
+	end if
+
+	' Only add the following fields if we extend from Group. Note node.isSubtype("Group") returns false if called on a Group node. This necessitates the second check.
+	if node.isSubtype("Group") OR nodeSubtype = "Group" then
+		nodeBranch.visible = node.visible
+		nodeBranch.opacity = node.opacity
+		nodeBranch.translation = node.translation
+	end if
+
+	flatTree.push(nodeBranch)
+
+	return nodeBranch
+end function
+
+' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
+function buildTreeCore(storedNodes as Object, flatTree as Object, node as Object, searchForArrayGrids as Boolean, arrayGridNodes = {} as Object, parentRef = -1 as Integer, position = -1 as Integer, sequestered = false as Boolean) as Object
+	nodeBranch = addNodeToTree(storedNodes, flatTree, node, parentRef, position, sequestered)
+
+	childPosition = 0
+	for each childNode in node.getChildren(-1, 0)
+		buildTreeCore(storedNodes, flatTree, childNode, searchForArrayGrids, arrayGridNodes, nodeRef, childPosition)
+		childPosition++
+	end for
+
+	return nodeBranch
+end function
+
+function processGetNodesWithPropertiesRequest(request as Object) as Object
+	args = request.args
+	nodeRefKey = args.nodeRefKey
+	if NOT RTA_isString(nodeRefKey) then
+		return RTA_buildErrorResponseObject("Invalid value supplied for 'nodeRefKey' param")
+	end if
+
+	storedNodes = m.nodeReferences[nodeRefKey]
+	if NOT RTA_isArray(storedNodes) then
+		return RTA_buildErrorResponseObject("Invalid nodeRefKey supplied '" + nodeRefKey + "'. Make sure you have stored first")
+	end if
+
+	matchingNodes = []
+	matchingNodeRefs = []
+	properties = args.properties
+	for nodeRef = 0 to RTA_getLastIndex(storedNodes)
+		node = storedNodes[nodeRef]
+		nodeMatches = true
+		for each property in properties
+			result = doesNodeHaveProperty(node, property)
+			if result = -1 then
+				return RTA_buildErrorResponseObject("Invalid type for property " + formatJson(property))
+			end if
+
+			if result = 0 then
+				nodeMatches = false
+				exit for
+			end if
+		end for
+		if nodeMatches then
+			matchingNodes.push(node)
+			matchingNodeRefs.push(nodeRef)
+		end if
+	end for
+
+	return {
+		"nodes": matchingNodes
+		"nodeRefs": matchingNodeRefs
+	}
+end function
+
+' TODO investigate if this still works or not
+function processDisableScreenSaverRequest(request as Object) as Object
+	args = request.args
+	if RTA_getBooleanAtKeyPath(args, "disableScreenSaver") then
+		if m.videoNode = Invalid then
+			m.videoNode = m.top.createChild("Video")
+			m.videoNode.disableScreenSaver = true
+		end if
+	else
+		if m.videoNode <> Invalid then
+			m.top.removeChild(m.videoNode)
+			m.videoNode = Invalid
+		end if
+	end if
+	return {}
+end function
+
+function processFocusNodeRequest(request as Object) as Object
+	args = request.args
+	result = processGetValueRequest(args)
+	if RTA_isErrorObject(result) then
+		return result
+	end if
+
+	if result.found <> true then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
+	end if
+
+	node = result.value
+	if NOT RTA_isNode(node) then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
+	end if
+
+	node.setFocus(RTA_getBooleanAtKeyPath(args, "on", true))
+
+	return {}
+end function
+
+function processCreateChildRequest(request as Object) as Object
+	args = request.args
+	result = processGetValueRequest(args)
+	if RTA_isErrorObject(result) then
+		return result
+	end if
+
+	if result.found <> true then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
+	end if
+
+	parent = result.value
+	if NOT RTA_isNode(parent) then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
+	end if
+
+	nodeSubtype = RTA_getStringAtKeyPath(args, "subtype")
+	node = parent.createChild(nodeSubtype)
+	if node <> Invalid then
+		fields = args.fields
+		if fields <> invalid then
+			node.update(fields, true)
+		end if
+	else
+		return RTA_buildErrorResponseObject("Failed to create " + nodeSubtype + " node")
+	end if
+
+	return {}
+end function
+
+function processRemoveNodeRequest(request as Object) as Object
+	args = request.args
+	result = processGetValueRequest(args)
+	if RTA_isErrorObject(result) then
+		return result
+	end if
+
+	if result.found <> true then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
+	end if
+
+	node = result.value
+	if NOT RTA_isNode(node) then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
+	end if
+
+	success = false
+	parent = node.getParent()
+	if parent <> Invalid then
+		success = parent.removeChild(node)
+		if NOT success then
+			return RTA_buildErrorResponseObject("Failed to remove node")
+		end if
+	end if
+
+	return {}
+end function
+
+function processRemoveNodeChildrenRequest(request as Object) as Object
+	args = request.args
+	result = processGetValueRequest(args)
+	if RTA_isErrorObject(result) then
+		return result
+	end if
+
+	if result.found <> true then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
+	end if
+
+	node = result.value
+	if NOT RTA_isNode(node) then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
+	end if
+
+	index = RTA_getNumberAtKeyPath(args, "index")
+	count = RTA_getNumberAtKeyPath(args, "count", 1)
+
+	if count = -1 then
+		count = node.getChildCount()
+	end if
+
+	success = node.removeChildrenIndex(count, index)
+	if NOT success then
+		return RTA_buildErrorResponseObject("Failed to remove children")
+	end if
+
+	return {}
+end function
+
+function processIsShowingOnScreenRequest(request as Object) as Object
+	args = request.args
+	isShowing = true
+	isFullyShowing = false
+
+	result = processGetValueRequest(args)
+	if RTA_isErrorObject(result) then
+		return result
+	end if
+
+	node = result.value
+	if NOT RTA_isNode(node) then
+		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
+		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
+	end if
+
+	parentNode = Invalid
+	if node.visible = false OR node.opacity = 0 then
+		isShowing = false
+		isFullyShowing = false
+	else
+		rect = node.sceneBoundingRect()
+
+		' Boundingrect is based off design resolution so need to use that to get the onscreen size
+		if m.currentDesignResolution = invalid then
+			m.currentDesignResolution = m.top.getScene().currentDesignResolution
+		end if
+
+		if rect.width = 0 OR rect.height = 0 then
+			isShowing = false
+		else if rect.x + rect.width < 0 OR rect.y + rect.height < 0 then
+			isShowing = false
+		else if rect.x > m.currentDesignResolution.width OR rect.y > m.currentDesignResolution.height then
+			isShowing = false
+		else
+			parentNode = node
+
+			if rect.x > 0 AND rect.x + rect.width <= m.currentDesignResolution.width AND rect.y > 0 AND rect.y + rect.height <= m.currentDesignResolution.height then
+				isFullyShowing = true
+			end if
+		end if
+	end if
+
+	' Have to check parents for visibility and opacity
+	while parentNode <> Invalid
+		parentNode = node.getParent()
+		if parentNode <> Invalid then
+			node = parentNode
+			if node.visible = false OR node.opacity = 0 then
+				isShowing = false
+				exit while
+			end if
+		end if
+	end while
+
+	return {
+		"isShowing": isShowing
+		"isFullyShowing": isFullyShowing
+	}
+end function
+
+function processSetSettingsRequest(request as Object) as Object
+	args = request.args
+	setLogLevel(RTA_getStringAtKeyPath(args, "logLevel"))
+
+	return {}
+end function
+
+function processBuildTreeRequest(request as Object) as Object
+	args = request.args
+	includeArrayGridChildren = RTA_getBooleanAtKeyPath(args, "includeArrayGridChildren")
+	includeBoundingRectInfo = RTA_getBooleanAtKeyPath(args, "includeBoundingRectInfo")
+
+	storedNodes = []
+	flatTree = []
+	scene = m.top.getScene()
+	buildTreeCore(storedNodes, flatTree, scene, includeArrayGridChildren)
+
+	if includeBoundingRectInfo then
+		for each nodeTree in flatTree
+			node = storedNodes[nodeTree.ref]
+			if nodeTree.rect = Invalid AND nodeTree.sceneRect = Invalid AND nodeTree.sequestered <> true then
+				nodeTree["sceneRect"] = node.sceneBoundingRect()
+			end if
+		end for
+
+		if m.currentDesignResolution = invalid then
+			m.currentDesignResolution = scene.currentDesignResolution
+		end if
+	end if
+
+	return {
+		"flatTree": flatTree
+	}
+end function
+
+' Returns 0 if no, 1 if yes and -1 if the comparison isn't possible on the current type
+function doesNodeHaveProperty(node as Object, property as Object) as Integer
+	result = 0
+	operator = property.operator
+	fields = property.fields
+	if RTA_isArray(fields) then
+		for each field in fields
+			if node.hasField(field) then
+				result = compareValues(operator, node[field], property.value)
+				if result <> 0 then
+					return result
+				end if
+			end if
+		end for
+	else if RTA_isArray(property.keyPaths) then
+		for each keyPath in property.keyPaths
+			' Route through keypath functionality to allow more advanced searches
+			actualValue = RTA_getValueAtKeyPath(node, keyPath, "[[VALUE_NOT_FOUND]]")
+			found = NOT RTA_isString(actualValue) OR actualValue <> "[[VALUE_NOT_FOUND]]"
+
+			if found then
+				result = compareValues(operator, actualValue, property.value)
+				if result <> 0 then
+					return result
+				end if
+			end if
+		end for
+	end if
+
+	return 0
+end function
+
+' Returns 0 if no, 1 if yes and -1 if the comparison isn't possible on the current type
+function compareValues(operator as String, a as Dynamic, b as Dynamic) as Integer
+	result = 0
+	if operator = "equal" then
+		if a = b then
+			return 1
+		end if
+	else if operator = "notEqual" then
+		if a <> b then
+			return 1
+		end if
+	else if operator = "greaterThan" OR operator = "greaterThanEqualTo" OR operator = "lessThan" OR operator = "lessThanEqualTo" then
+		if RTA_isNumber(a) AND RTA_isNumber(b) then
+			if operator = "greaterThan" then
+				if a > b then
+					return 1
+				end if
+			else if operator = "greaterThanEqualTo" then
+				if a >= b then
+					return 1
+				end if
+			else if operator = "lessThan" then
+				if a < b then
+					return 1
+				end if
+			else if operator = "lessThanEqualTo" then
+				if a <= b then
+					return 1
+				end if
+			end if
+		else
+			result = -1
+		end if
+	else if operator = "in" OR operator = "!in" then
+		' Only string checking allowed for now
+		if RTA_isString(a) AND RTA_isString(b) then
+			found = a.instr(b) >= 0
+
+			if operator = "in" AND found then
+				return 1
+			else if operator = "!in" AND NOT found then
+				return 1
+			end if
+		else
+			result = -1
+		end if
+	end if
+
+	return result
+end function
+
+function getBaseObject(args as Object) as Dynamic
+	baseType = RTA_getStringAtKeyPath(args, "base")
+	if baseType = "global" then return m.global
+	if baseType = "scene" then return m.top.getScene()
+	if baseType = "focusedNode" then return RTA_getFocusedNode()
+	if baseType = "nodeRef" then
+		nodeRefKey = RTA_getStringAtKeyPath(args, "nodeRefKey")
+		base = m.nodeReferences[nodeRefKey]
+		if base = Invalid then
+			return RTA_buildErrorResponseObject("Invalid nodeRefKey supplied '" + nodeRefKey + "'. Make sure you have stored first")
+		else
+			return base
+		end if
+	else if baseType = "elementId" then
+		' Element ID will always be the first part of the key path
+		keyPathParts = RTA_getStringAtKeyPath(args, "keyPath").split(".")
+
+		matchingElementId = keyPathParts.shift()
+		if matchingElementId = invalid then
+			return RTA_buildErrorResponseObject("Base type of elementId but no keyPath provided")
+		end if
+
+		allNodes = m.top.getAll()
+		for each node in allNodes
+			elementId = node.getUIElementId()
+			if elementId = matchingElementId then
+				' We have to modify the returned key path to exclude the elementId part of the key path. Still debating if it should be a separate argument or continue including in keyPath arg.
+				args.keyPath = keyPathParts.join(".")
+				return node
+			end if
+		end for
+
+		return RTA_buildErrorResponseObject("Could not find elementId '" + matchingElementId + "'")
+	end if
+	return RTA_buildErrorResponseObject("Invalid base type supplied '" + baseType + "'")
+end function
+
+sub sendResponseToTask(request as Object, response as Object)
+	if RTA_getBooleanAtKeyPath(request, "args.convertResponseToJsonCompatible", true) then
+		try
+			response = recursivelyConvertValueToJsonCompatible(response, RTA_getNumberAtKeyPath(request, "args.responseMaxChildDepth"))
+		catch e
+			response = RTA_buildErrorResponseObject("Error converting value to json compatible: " + e.message)
+		end try
+	end if
+
+	response.id = request.id
+	response["timeTaken"] = request.timespan.totalMilliseconds()
+	request.timespan.mark() 'For the onFieldChangeRepeat, maybe needs an adjustment on future, for now it will only indicates the time between the same request id
+	m.task.renderThreadResponse = response
+end sub
+
+function recursivelyConvertValueToJsonCompatible(value as Object, maxChildDepth as Integer, depth = -1 as Integer, recursiveObjects = [] as Object) as Object
+	if RTA_isString(value) = false then
+		recursionTest = formatJson(value, 512)
+		' Empty string for a nonstring object means this is a recursive object that can't be fully converted to json
+		if recursionTest = "" then
+			' Check if we have access to IsSameObject
+			utils = createObject("roUtils")
+			if utils = invalid then
+				' If we don't have access just throw an error
+				return RTA_buildErrorResponseObject("Recursion detected")
+			end if
+
+			for each recursiveObject in recursiveObjects
+				if utils.isSameObject(recursiveObject, value) then
+					return "[[RECURSION]]"
+				end if
+			end for
+
+			recursiveObjects.push(value)
+		end if
+	end if
+
+	if RTA_isArray(value) then
+		for i = 0 to RTA_getLastIndex(value)
+			value[i] = recursivelyConvertValueToJsonCompatible(value[i], maxChildDepth, depth, recursiveObjects)
+		end for
+	else if RTA_isAA(value) then
+		for each key in value
+			value[key] = recursivelyConvertValueToJsonCompatible(value[key], maxChildDepth, depth, recursiveObjects)
+		end for
+	else if RTA_isNode(value) then
+		depth++
+		node = value
+		if maxChildDepth < depth then
+			value = {
+				"id": node.id
+			}
+		else
+			value = node.getFields()
+			value.delete("focusedChild")
+			value = recursivelyConvertValueToJsonCompatible(value, maxChildDepth, depth, recursiveObjects)
+			if maxChildDepth > depth then
+				children = []
+				for each child in node.getChildren(-1, 0)
+					children.push(recursivelyConvertValueToJsonCompatible(child, maxChildDepth, depth, recursiveObjects))
+				end for
+				value.children = children
+			end if
+		end if
+
+		value.subtype = node.subtype()
+	end if
+
+	return value
+end function
+
+
+
+' Code to remove in 3.0
+
+' Remove in 3.0
 ' ArrayGrid children can't be built with a normal call to buildTree since you can only get the parent not the children.
 ' Often times nodes are in different spots, so this will also standardize them to a single consistent spot
 sub buildItemComponentTrees(storedNodes as Object, flatTree as Object, itemComponentNodes as Object, arrayGridNodes as Object, allNodes as Object, includeBoundingRectInfo = false as Boolean)
@@ -1214,36 +1614,7 @@ sub buildItemComponentTrees(storedNodes as Object, flatTree as Object, itemCompo
 	end for
 end sub
 
-' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
-function addNodeToTree(storedNodes as Object, flatTree as Object, node as Object, parentRef = -1 as Integer, position = -1 as Integer, sequestered = false as Boolean) as Object
-	currentNodeReference = storedNodes.count()
-	storedNodes.push(node)
-
-	nodeSubtype = node.subtype()
-	nodeBranch = {
-		"subtype": nodeSubtype
-		"id": node.id
-		"ref": currentNodeReference
-		"parentRef": parentRef
-		"position": position
-	}
-
-	if sequestered then
-		nodeBranch.sequestered = true
-	end if
-
-	' Only add the following fields if we extend from Group. Note node.isSubtype("Group") returns false if called on a Group node. This necessitates the second check.
-	if node.isSubtype("Group") OR nodeSubtype = "Group" then
-		nodeBranch.visible = node.visible
-		nodeBranch.opacity = node.opacity
-		nodeBranch.translation = node.translation
-	end if
-
-	flatTree.push(nodeBranch)
-
-	return nodeBranch
-end function
-
+' Remove in 3.0
 ' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
 function buildTree(storedNodes as Object, flatTree as Object, node as Object, searchForArrayGrids as Boolean, arrayGridNodes = {} as Object, parentRef = -1 as Integer, position = -1 as Integer, sequestered = false as Boolean) as Object
 	nodeBranch = addNodeToTree(storedNodes, flatTree, node, parentRef, position, sequestered)
@@ -1261,157 +1632,7 @@ function buildTree(storedNodes as Object, flatTree as Object, node as Object, se
 	return nodeBranch
 end function
 
-function processDeleteNodeReferencesRequest(request as Object) as Object
-	args = request.args
-	nodeRefKey = args.nodeRefKey
-	if NOT RTA_isString(nodeRefKey) then
-		return RTA_buildErrorResponseObject("Invalid value supplied for 'key' param")
-	end if
-	m.nodeReferences.delete(nodeRefKey)
-
-	return {}
-end function
-
-function processGetNodesWithPropertiesRequest(request as Object) as Object
-	args = request.args
-	nodeRefKey = args.nodeRefKey
-	if NOT RTA_isString(nodeRefKey) then
-		return RTA_buildErrorResponseObject("Invalid value supplied for 'nodeRefKey' param")
-	end if
-
-	storedNodes = m.nodeReferences[nodeRefKey]
-	if NOT RTA_isArray(storedNodes) then
-		return RTA_buildErrorResponseObject("Invalid nodeRefKey supplied '" + nodeRefKey + "'. Make sure you have stored first")
-	end if
-
-	matchingNodes = []
-	matchingNodeRefs = []
-	properties = args.properties
-	for nodeRef = 0 to RTA_getLastIndex(storedNodes)
-		node = storedNodes[nodeRef]
-		nodeMatches = true
-		for each property in properties
-			result = doesNodeHaveProperty(node, property)
-			if result = -1 then
-				return RTA_buildErrorResponseObject("Invalid type for property " + formatJson(property))
-			end if
-
-			if result = 0 then
-				nodeMatches = false
-				exit for
-			end if
-		end for
-		if nodeMatches then
-			matchingNodes.push(node)
-			matchingNodeRefs.push(nodeRef)
-		end if
-	end for
-
-	return {
-		"nodes": matchingNodes
-		"nodeRefs": matchingNodeRefs
-	}
-end function
-
-' Returns 0 if no, 1 if yes and -1 if the comparison isn't possible on the current type
-function doesNodeHaveProperty(node as Object, property as Object) as Integer
-	result = 0
-	operator = property.operator
-	fields = property.fields
-	if RTA_isArray(fields) then
-		for each field in fields
-			if node.hasField(field) then
-				result = compareValues(operator, node[field], property.value)
-				if result <> 0 then
-					return result
-				end if
-			end if
-		end for
-	else if RTA_isArray(property.keyPaths) then
-		for each keyPath in property.keyPaths
-			' Route through keypath functionality to allow more advanced searches
-			actualValue = RTA_getValueAtKeyPath(node, keyPath, "[[VALUE_NOT_FOUND]]")
-			found = NOT RTA_isString(actualValue) OR actualValue <> "[[VALUE_NOT_FOUND]]"
-
-			if found then
-				result = compareValues(operator, actualValue, property.value)
-				if result <> 0 then
-					return result
-				end if
-			end if
-		end for
-	end if
-
-	return 0
-end function
-
-' Returns 0 if no, 1 if yes and -1 if the comparison isn't possible on the current type
-function compareValues(operator as String, a as Dynamic, b as Dynamic) as Integer
-	result = 0
-	if operator = "equal" then
-		if a = b then
-			return 1
-		end if
-	else if operator = "notEqual" then
-		if a <> b then
-			return 1
-		end if
-	else if operator = "greaterThan" OR operator = "greaterThanEqualTo" OR operator = "lessThan" OR operator = "lessThanEqualTo" then
-		if RTA_isNumber(a) AND RTA_isNumber(b) then
-			if operator = "greaterThan" then
-				if a > b then
-					return 1
-				end if
-			else if operator = "greaterThanEqualTo" then
-				if a >= b then
-					return 1
-				end if
-			else if operator = "lessThan" then
-				if a < b then
-					return 1
-				end if
-			else if operator = "lessThanEqualTo" then
-				if a <= b then
-					return 1
-				end if
-			end if
-		else
-			result = -1
-		end if
-	else if operator = "in" OR operator = "!in" then
-		' Only string checking allowed for now
-		if RTA_isString(a) AND RTA_isString(b) then
-			found = a.instr(b) >= 0
-
-			if operator = "in" AND found then
-				return 1
-			else if operator = "!in" AND NOT found then
-				return 1
-			end if
-		else
-			result = -1
-		end if
-	end if
-
-	return result
-end function
-
-function processDisableScreenSaverRequest(request as Object) as Object
-	args = request.args
-	if RTA_getBooleanAtKeyPath(args, "disableScreenSaver") then
-		if m.videoNode = Invalid then
-			m.videoNode = m.top.createChild("Video")
-			m.videoNode.disableScreenSaver = true
-		end if
-	else
-		if m.videoNode <> Invalid then
-			m.top.removeChild(m.videoNode)
-			m.videoNode = Invalid
-		end if
-	end if
-	return {}
-end function
-
+' Remove in 3.0
 function processStartResponsivenessTestingRequest(request as Object) as Object
 	args = request.args
 	' Using 60 FPS as our baseline but timers work on a millisecond level so everything is a little bit off
@@ -1453,6 +1674,7 @@ function processStartResponsivenessTestingRequest(request as Object) as Object
 	return {}
 end function
 
+' Remove in 3.0
 function processStopResponsivenessTestingRequest(_request as Object) as Object
 	if m.responsivenessTestingTickTimer <> invalid then
 		m.responsivenessTestingTickTimer.control = "stop"
@@ -1467,10 +1689,12 @@ function processStopResponsivenessTestingRequest(_request as Object) as Object
 	return {}
 end function
 
+' Remove in 3.0
 sub onResponsivenessTestingTickTimerFire()
 	m.responsivenessTestingCurrentPeriodTickCount++
 end sub
 
+' Remove in 3.0
 sub onResponsivenessTestingCurrentPeriodTimerFire()
 	elapsedTime = m.responsivenessTestingCurrentPeriodTimeSpan.totalMilliseconds()
 	m.responsivenessTestingCurrentPeriodTimeSpan.mark()
@@ -1495,6 +1719,7 @@ sub onResponsivenessTestingCurrentPeriodTimerFire()
 	end while
 end sub
 
+' Remove in 3.0
 function processGetResponsivenessTestingDataRequest(_request as Object) as Object
 	if m.responsivenessTestingData = invalid then
 		return RTA_buildErrorResponseObject("Responsiveness testing is not started. Be sure to call 'startResponsivenessTesting()' first")
@@ -1519,296 +1744,126 @@ function processGetResponsivenessTestingDataRequest(_request as Object) as Objec
 	}
 end function
 
-function processFocusNodeRequest(request as Object) as Object
+' Remove in 3.0
+function processDeleteNodeReferencesRequest(request as Object) as Object
 	args = request.args
-	result = processGetValueRequest(args)
-	if RTA_isErrorObject(result) then
-		return result
+	nodeRefKey = args.nodeRefKey
+	if NOT RTA_isString(nodeRefKey) then
+		return RTA_buildErrorResponseObject("Invalid value supplied for 'key' param")
 	end if
-
-	if result.found <> true then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
-	end if
-
-	node = result.value
-	if NOT RTA_isNode(node) then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
-	end if
-
-	node.setFocus(RTA_getBooleanAtKeyPath(args, "on", true))
+	m.nodeReferences.delete(nodeRefKey)
 
 	return {}
 end function
 
-function processCreateChildRequest(request as Object) as Object
+' Remove in 3.0
+function processStoreNodeReferencesRequest(request as Object) as Object
 	args = request.args
-	result = processGetValueRequest(args)
-	if RTA_isErrorObject(result) then
-		return result
+	nodeRefKey = args.nodeRefKey
+
+	includeArrayGridChildren = RTA_getBooleanAtKeyPath(args, "includeArrayGridChildren")
+	includeNodeCountInfo = RTA_getBooleanAtKeyPath(args, "includeNodeCountInfo")
+	includeBoundingRectInfo = RTA_getBooleanAtKeyPath(args, "includeBoundingRectInfo")
+
+	if NOT RTA_isNonEmptyString(nodeRefKey) then
+		return RTA_buildErrorResponseObject("Invalid value supplied for 'nodeRefKey' param")
 	end if
 
-	if result.found <> true then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
-	end if
+	storedNodes = []
+	' Clear out old nodes before getting next retrieval of nodes
+	m.nodeReferences[nodeRefKey] = storedNodes
+	flatTree = []
 
-	parent = result.value
-	if NOT RTA_isNode(parent) then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
-	end if
+	arrayGridNodes = {}
+	scene = m.top.getScene()
+	buildTree(storedNodes, flatTree, scene, includeArrayGridChildren, arrayGridNodes)
 
-	nodeSubtype = RTA_getStringAtKeyPath(args, "subtype")
-	node = parent.createChild(nodeSubtype)
-	if node <> Invalid then
-		fields = args.fields
-		if fields <> invalid then
-			node.update(fields, true)
-		end if
-	else
-		return RTA_buildErrorResponseObject("Failed to create " + nodeSubtype + " node")
-	end if
-
-	return {}
-end function
-
-function processRemoveNodeRequest(request as Object) as Object
-	args = request.args
-	result = processGetValueRequest(args)
-	if RTA_isErrorObject(result) then
-		return result
-	end if
-
-	if result.found <> true then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
-	end if
-
-	node = result.value
-	if NOT RTA_isNode(node) then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
-	end if
-
-	success = false
-	parent = node.getParent()
-	if parent <> Invalid then
-		success = parent.removeChild(node)
-		if NOT success then
-			return RTA_buildErrorResponseObject("Failed to remove node")
-		end if
-	end if
-
-	return {}
-end function
-
-function processRemoveNodeChildrenRequest(request as Object) as Object
-	args = request.args
-	result = processGetValueRequest(args)
-	if RTA_isErrorObject(result) then
-		return result
-	end if
-
-	if result.found <> true then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("No value found at key path '" + keyPath + "'")
-	end if
-
-	node = result.value
-	if NOT RTA_isNode(node) then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
-	end if
-
-	index = RTA_getNumberAtKeyPath(args, "index")
-	count = RTA_getNumberAtKeyPath(args, "count", 1)
-
-	if count = -1 then
-		count = node.getChildCount()
-	end if
-
-	success = node.removeChildrenIndex(count, index)
-	if NOT success then
-		return RTA_buildErrorResponseObject("Failed to remove children")
-	end if
-
-	return {}
-end function
-
-function processIsShowingOnScreenRequest(request as Object) as Object
-	args = request.args
-	isShowing = true
-	isFullyShowing = false
-
-	result = processGetValueRequest(args)
-	if RTA_isErrorObject(result) then
-		return result
-	end if
-
-	node = result.value
-	if NOT RTA_isNode(node) then
-		keyPath = RTA_getStringAtKeyPath(args, "keyPath")
-		return RTA_buildErrorResponseObject("Value at key path '" + keyPath + "' was not a node")
-	end if
-
-	parentNode = Invalid
-	if node.visible = false OR node.opacity = 0 then
-		isShowing = false
-		isFullyShowing = false
-	else
-		rect = node.sceneBoundingRect()
-
-		' Boundingrect is based off design resolution so need to use that to get the onscreen size
-		if m.currentDesignResolution = invalid then
-			m.currentDesignResolution = m.top.getScene().currentDesignResolution
-		end if
-
-		if rect.width = 0 OR rect.height = 0 then
-			isShowing = false
-		else if rect.x + rect.width < 0 OR rect.y + rect.height < 0 then
-			isShowing = false
-		else if rect.x > m.currentDesignResolution.width OR rect.y > m.currentDesignResolution.height then
-			isShowing = false
-		else
-			parentNode = node
-
-			if rect.x > 0 AND rect.x + rect.width <= m.currentDesignResolution.width AND rect.y > 0 AND rect.y + rect.height <= m.currentDesignResolution.height then
-				isFullyShowing = true
-			end if
-		end if
-	end if
-
-	' Have to check parents for visibility and opacity
-	while parentNode <> Invalid
-		parentNode = node.getParent()
-		if parentNode <> Invalid then
-			node = parentNode
-			if node.visible = false OR node.opacity = 0 then
-				isShowing = false
-				exit while
-			end if
-		end if
-	end while
-
-	return {
-		"isShowing": isShowing
-		"isFullyShowing": isFullyShowing
+	result = {
+		"flatTree": flatTree
 	}
-end function
 
-function processSetSettingsRequest(request as Object) as Object
-	args = request.args
-	setLogLevel(RTA_getStringAtKeyPath(args, "logLevel"))
+	arrayGridComponents = {}
+	nodeCountByType = {}
+	itemComponentNodes = []
 
-	return {}
-end function
-
-function getBaseObject(args as Object) as Dynamic
-	baseType = RTA_getStringAtKeyPath(args, "base")
-	if baseType = "global" then return m.global
-	if baseType = "scene" then return m.top.getScene()
-	if baseType = "focusedNode" then return RTA_getFocusedNode()
-	if baseType = "nodeRef" then
-		nodeRefKey = RTA_getStringAtKeyPath(args, "nodeRefKey")
-		base = m.nodeReferences[nodeRefKey]
-		if base = Invalid then
-			return RTA_buildErrorResponseObject("Invalid nodeRefKey supplied '" + nodeRefKey + "'. Make sure you have stored first")
-		else
-			return base
-		end if
-	else if baseType = "elementId" then
-		' Element ID will always be the first part of the key path
-		keyPathParts = RTA_getStringAtKeyPath(args, "keyPath").split(".")
-
-		matchingElementId = keyPathParts.shift()
-		if matchingElementId = invalid then
-			return RTA_buildErrorResponseObject("Base type of elementId but no keyPath provided")
+	if includeArrayGridChildren OR includeNodeCountInfo then
+		if includeArrayGridChildren then
+			for each key in arrayGridNodes
+				node = arrayGridNodes[key]
+				componentName = node.itemComponentName
+				if RTA_isString(componentName) then
+					arrayGridComponents[componentName] = true
+				else if RTA_isString(node.channelInfoComponentName) then
+					componentName = node.channelInfoComponentName
+					arrayGridComponents[componentName] = true
+				end if
+			end for
 		end if
 
 		allNodes = m.top.getAll()
+		result["totalNodes"] = allNodes.count()
 		for each node in allNodes
-			elementId = node.getUIElementId()
-			if elementId = matchingElementId then
-				' We have to modify the returned key path to exclude the elementId part of the key path. Still debating if it should be a separate argument or continue including in keyPath arg.
-				args.keyPath = keyPathParts.join(".")
-				return node
+			nodeType = node.subtype()
+			if nodeCountByType[nodeType] = Invalid then
+				nodeCountByType[nodeType] = 0
+			end if
+			nodeCountByType[nodeType]++
+
+			if includeArrayGridChildren AND arrayGridComponents[nodeType] = true then
+				itemComponentNodes.push(node)
 			end if
 		end for
 
-		return RTA_buildErrorResponseObject("Could not find elementId '" + matchingElementId + "'")
-	end if
-	return RTA_buildErrorResponseObject("Invalid base type supplied '" + baseType + "'")
-end function
+		if includeArrayGridChildren then
+			buildItemComponentTrees(storedNodes, flatTree, itemComponentNodes, arrayGridNodes, allNodes, includeBoundingRectInfo)
+		end if
 
-sub sendResponseToTask(request as Object, response as Object)
-	if RTA_getBooleanAtKeyPath(request, "args.convertResponseToJsonCompatible", true) then
-		try
-			response = recursivelyConvertValueToJsonCompatible(response, RTA_getNumberAtKeyPath(request, "args.responseMaxChildDepth"))
-		catch e
-			response = RTA_buildErrorResponseObject("Error converting value to json compatible: " + e.message)
-		end try
+		result["nodeCountByType"] = nodeCountByType
 	end if
 
-	response.id = request.id
-	response["timeTaken"] = request.timespan.totalMilliseconds()
-	request.timespan.mark() 'For the onFieldChangeRepeat, maybe needs an adjustment on future, for now it will only indicates the time between the same request id
-	m.task.renderThreadResponse = response
-end sub
+	if includeBoundingRectInfo then
+		for each nodeTree in flatTree
+			' We use the visible field we added to only calculate rect if this is a RenderableNode.
+			if nodeTree.visible <> Invalid then
+				node = storedNodes[nodeTree.ref]
 
-function recursivelyConvertValueToJsonCompatible(value as Object, maxChildDepth as Integer, depth = -1 as Integer, recursiveObjects = [] as Object) as Object
-	if RTA_isString(value) = false then
-		recursionTest = formatJson(value, 512)
-		' Empty string for a nonstring object means this is a recursive object that can't be fully converted to json
-		if recursionTest = "" then
-			' Check if we have access to IsSameObject
-			utils = createObject("roUtils")
-			if utils = invalid then
-				' If we don't have access just throw an error
-				return RTA_buildErrorResponseObject("Recursion detected")
-			end if
+				if arrayGridComponents[nodeTree.subtype] = true then
+					' We need to get rect differently for our arrayGridComponents as the x and y are often wrong if we called sceneBoundingRect on the ArrayGrid component itself
+					parentTree = flatTree[nodeTree.parentRef]
+					itemIndex = [nodeTree.position.toStr()]
 
-			for each recursiveObject in recursiveObjects
-				if utils.isSameObject(recursiveObject, value) then
-					return "[[RECURSION]]"
+					' We need to build our properly formatted itemNumber string by walking up the parents until we get to the outer ArrayGrid parent. We can't use the inner MarkupGrid as this gives incorrect results sometimes as well.
+					while parentTree <> Invalid
+						if parentTree.subtype = "RowListItem" then
+							itemIndex.unshift(parentTree.position.toStr())
+						else if parentTree.sequestered <> true then
+							' Once we hit our first non sequestered parent we know we've hit our parent ArrayGrid
+							itemNumber = "item" + itemIndex[0]
+							if itemIndex.count() = 2 then
+								itemNumber += "_" + itemIndex[1]
+							end if
+							' For debugging
+							' nodeTree["itemNumber"] = itemNumber
+							nodeTree["sceneRect"] = storedNodes[parentTree.ref].sceneSubBoundingRect(itemNumber)
+							exit while
+						end if
+
+						parentTree = flatTree[parentTree.parentRef]
+					end while
+				else if nodeTree.rect = Invalid AND nodeTree.sceneRect = Invalid AND nodeTree.sequestered <> true then
+					' We don't want to try and get rects for sequestered nodes as those values are often wrong.
+					nodeTree["sceneRect"] = node.sceneBoundingRect()
 				end if
-			end for
-
-			recursiveObjects.push(value)
-		end if
-	end if
-
-	if RTA_isArray(value) then
-		for i = 0 to RTA_getLastIndex(value)
-			value[i] = recursivelyConvertValueToJsonCompatible(value[i], maxChildDepth, depth, recursiveObjects)
-		end for
-	else if RTA_isAA(value) then
-		for each key in value
-			value[key] = recursivelyConvertValueToJsonCompatible(value[key], maxChildDepth, depth, recursiveObjects)
-		end for
-	else if RTA_isNode(value) then
-		depth++
-		node = value
-		if maxChildDepth < depth then
-			value = {
-				"id": node.id
-			}
-		else
-			value = node.getFields()
-			value.delete("focusedChild")
-			value = recursivelyConvertValueToJsonCompatible(value, maxChildDepth, depth, recursiveObjects)
-			if maxChildDepth > depth then
-				children = []
-				for each child in node.getChildren(-1, 0)
-					children.push(recursivelyConvertValueToJsonCompatible(child, maxChildDepth, depth, recursiveObjects))
-				end for
-				value.children = children
 			end if
-		end if
+		end for
 
-		value.subtype = node.subtype()
+		if m.currentDesignResolution = invalid then
+			m.currentDesignResolution = scene.currentDesignResolution
+		end if
+		result["currentDesignResolution"] = m.currentDesignResolution
 	end if
 
-	return value
+	m.nodeReferences[nodeRefKey] = storedNodes
+
+	return result
 end function
