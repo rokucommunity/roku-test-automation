@@ -456,19 +456,6 @@ There are number of comparison operators that can be used:
 
 **NOTE** Not all comparison types can be used on all types. For example `>=` can only be used on number types.
 
-#### `convertKeyPathToSceneKeyPath`
-
-> convertKeyPathToSceneKeyPath(args: [ODC.ConvertKeyPathToSceneKeyPathArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20ConvertKeyPathToSceneKeyPathArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {base: 'scene', keyPath: string, timeTaken: number}
-
-Converts an appUI or other base key path to a scene-based key path. Useful when you need to work with scene references but only have appUI paths.
-
-```ts
-const sceneKeyPath = await odc.convertKeyPathToSceneKeyPath({
-  base: 'appUI',
-  keyPath: '#myComponent.#childNode'
-});
-```
-
 #### `assignElementIdOnAllNodes`
 
 > assignElementIdOnAllNodes(args: [ODC.AssignElementIdOnAllNodesArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20AssignElementIdOnAllNodesArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): [AssignElementIdOnAllNodesResponse](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20AssignElementIdOnAllNodesResponse)

@@ -765,13 +765,18 @@ steps:
 
 	describe('getAppUI', function () {
 		let appUIResponse: AppUIResponse;
+		let mockOdc: any;
 
 		beforeEach(async () => {
 			ecpResponse = await testUtils.getNeedleMockResponse('ECP/getAppUI/appUIResponse');
+			mockOdc = {
+				assignElementIdOnAllNodes: sinon.stub().resolves({}),
+				getChildrenByElementId: sinon.stub().resolves({ results: {}, timeTaken: 0 })
+			};
 		});
 
 		it('Should add the sceneBoundingRects for scene', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 
 			expect(appUIResponse.screen.children[0].sceneRect).to.haveOwnProperty('x');
 			expect(appUIResponse.screen.children[0].sceneRect).to.haveOwnProperty('y');
@@ -780,7 +785,7 @@ steps:
 		});
 
 		it('Should add the sceneBoundingRects for scene\'s children\'s children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 
 			for (const child of appUIResponse.screen?.children?.[0]?.children?.[4]?.children || []) {
 				expect(child.sceneRect).to.haveOwnProperty('x');
@@ -791,7 +796,7 @@ steps:
 		});
 
 		it('should not return a key path for RowListItem or internal MarkupGrid but should still create the correct key path for its children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const row1 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[7]?.children?.[0];
 			expect(row1?.subtype).to.equal('RowListItem');
 			expect(row1?.keyPath).to.be.undefined;
@@ -806,7 +811,7 @@ steps:
 		});
 
 		it('should return correct position for a node with offset bounds due to children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rect3 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0].children?.[2].children?.[0];
 			expect(rect3?.keyPath).to.equal('#pagesContainerGroup.0.#rect2.#rect3');
 			expect(rect3?.sceneRect?.height).to.equal(50);
@@ -816,7 +821,7 @@ steps:
 		});
 
 		it('should return correct position for a node with offset bounds due to children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const offsetGroup = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0].children?.[3];
 			expect(offsetGroup?.keyPath).to.equal('#pagesContainerGroup.0.#offsetGroup');
 			expect(offsetGroup?.sceneRect?.height).to.equal(100);
@@ -826,7 +831,7 @@ steps:
 		});
 
 		it('should return correct position for a RowList item', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rowListItemComponent0 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[7]?.children?.[0].children?.[2].children?.[0];
 			expect(rowListItemComponent0?.keyPath).to.equal('#pagesContainerGroup.0.#rowListWithoutCustomTitleComponent.0.items.0');
 			expect(rowListItemComponent0?.sceneRect?.height).to.equal(150);
@@ -836,7 +841,7 @@ steps:
 		});
 
 		it('should return correct position for the second row RowList item', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rowListItemComponent1_0 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[7]?.children?.[1].children?.[2].children?.[0];
 			expect(rowListItemComponent1_0?.keyPath).to.equal('#pagesContainerGroup.0.#rowListWithoutCustomTitleComponent.1.items.0');
 			expect(rowListItemComponent1_0?.sceneRect?.height).to.equal(150);
@@ -846,7 +851,7 @@ steps:
 		});
 
 		it('should return correct position for a custom row title element', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rowListCustomRowTitle0 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[8]?.children?.[0].children?.[0].children?.[0];
 			expect(rowListCustomRowTitle0?.keyPath).to.equal('#pagesContainerGroup.0.#rowListWithCustomTitleComponent.0.title');
 			expect(rowListCustomRowTitle0?.sceneRect?.height).to.equal(36);

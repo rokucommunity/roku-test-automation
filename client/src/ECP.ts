@@ -302,14 +302,11 @@ export class ECP {
 
 	/**
 	 * Gets the App UI tree from the device, providing detailed information about the currently displayed UI elements.
-	 * When an OnDeviceComponent instance is provided, non-renderable nodes (Task, Timer, Animation, etc.) that are
-	 * excluded from the ECP response will be filled in via ODC, and all key paths will use scene base with correct indices.
-	 * Without ODC, key paths use appUI base and non-renderable nodes are not included.
+	 * Non-renderable nodes (Task, Timer, Animation, etc.) that are excluded from the ECP response will be filled in
+	 * via ODC, and all key paths use scene base with correct indices.
 	 */
-	public async getAppUI(odc?: OnDeviceComponent) {
-		if (odc) {
-			await odc.assignElementIdOnAllNodes({});
-		}
+	public async getAppUI(odc: OnDeviceComponent) {
+		await odc.assignElementIdOnAllNodes({});
 
 		const result = await this.device.sendEcpGet(`query/app-ui`);
 
@@ -333,15 +330,9 @@ export class ECP {
 		sceneNode.base = 'scene';
 		sceneNode.keyPath = '';
 
-		if (odc) {
-			await this.fillGapChildren(odc, sceneNode);
-			this.regenerateSceneKeyPaths(sceneNode);
-		} else {
-			if (sceneNode.children) {
-				for (const [position, child] of sceneNode.children.entries()) {
-					this.generateKeyPathsFromAppUIResponse(child, { position: position });
-				}
-			}
+		await this.fillGapChildren(odc, sceneNode);
+		for (const [position, child] of (sceneNode.children ?? []).entries()) {
+			this.generateSceneKeyPaths(child, { position: position });
 		}
 
 		this.calculateSceneBoundingRects(sceneNode);
@@ -369,21 +360,6 @@ export class ECP {
 			}
 		} catch (e) {
 			console.error('Failed to fill gap children:', e);
-		}
-	}
-
-	private regenerateSceneKeyPaths(sceneNode: AppUIResponseChild) {
-		this.clearKeyPaths(sceneNode);
-
-		for (const [position, child] of (sceneNode.children ?? []).entries()) {
-			this.generateSceneKeyPaths(child, { position: position });
-		}
-	}
-
-	private clearKeyPaths(node: AppUIResponseChild) {
-		for (const child of node.children ?? []) {
-			child.keyPath = '';
-			this.clearKeyPaths(child);
 		}
 	}
 
@@ -501,75 +477,6 @@ export class ECP {
 			}
 
 			this.calculateSceneBoundingRects(child, node, childOffset);
-		}
-	}
-
-	private generateKeyPathsFromAppUIResponse(node: AppUIResponseChild, keyPathContext: {
-		position: number;
-		duplicateIdsFound?: boolean;
-		parent?: AppUIResponseChild;
-	}, keyPathParts: string[] = []) {
-		const currentNodeKeyPathParts = [...keyPathParts];
-
-		// Only add key path if it doesn't already exist
-		let addKeyPath = !node.keyPath;
-
-		if (node.subtype == 'RowListItem') {
-			// Don't want to add key paths for RowListItem but want to add onto key path parts
-			addKeyPath = false;
-
-			currentNodeKeyPathParts.push(keyPathContext.position.toString());
-		} else if (keyPathContext.parent?.subtype == 'RowListItem') { // We have to make our magic key paths for RowList
-			// don't add key paths by default for RowListItem
-			addKeyPath = false;
-
-			// Title is always the first child of the RowListItem
-			if (keyPathContext.position == 0) {
-				currentNodeKeyPathParts.push('title');
-
-				if (node.subtype == 'Label') {
-					addKeyPath = true;
-				} else {
-					// We need to add it to the child instead so it is tied to the actual custom component
-					const child = node.children?.[0];
-					if (child) {
-						node.base = 'appUI';
-						child.keyPath = currentNodeKeyPathParts.join('.');
-					}
-				}
-			} else if (node.subtype === 'MarkupGrid') {
-				currentNodeKeyPathParts.push('items');
-			}
-		} else if (addKeyPath && node.id && !keyPathContext.duplicateIdsFound) {
-			currentNodeKeyPathParts.push(`#${node.id}`);
-		} else if (addKeyPath) {
-			currentNodeKeyPathParts.push(keyPathContext.position.toString());
-		}
-
-		if (addKeyPath) {
-			// We always need to use appUI as the base for the key path. Originally we would try to use scene for non ArrayGrid items but nodes that don't extend Group are excluded in the app-ui response so we can't use scene as the base because index based key path parts will then get off.
-			node.base = 'appUI';
-			node.keyPath = currentNodeKeyPathParts.join('.');
-		}
-
-		const children = node.children ?? [];
-		for (const [childPosition, childNode] of children.entries()) {
-			const duplicateIds = children.filter((child, index) => {
-				if (child.id) {
-					if (child.id == childNode.id && index != childPosition) {
-						return true;
-					}
-				}
-				return false;
-			});
-
-			keyPathContext = {
-				position: childPosition,
-				parent: node,
-				duplicateIdsFound: duplicateIds.length > 0,
-			};
-
-			this.generateKeyPathsFromAppUIResponse(childNode, keyPathContext, currentNodeKeyPathParts);
 		}
 	}
 
