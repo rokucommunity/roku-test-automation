@@ -15,6 +15,7 @@ sub init()
 		"focusNode": processFocusNodeRequest
 		"getAllCount": processGetAllCountRequest
 		"getFocusedNode": processGetFocusedNodeRequest
+		"getChildrenByElementId": processGetChildrenByElementIdRequest
 		"getNodesInfo": processGetNodesInfoRequest
 		"getNodesWithProperties": processGetNodesWithPropertiesRequest
 		"getResponsivenessTestingData": processGetResponsivenessTestingDataRequest
@@ -48,8 +49,9 @@ sub onRenderThreadRequestChange(event as Object)
 	' Don't want to take the overhead if we are not logging debug
 	if RTA_canLog("debug") then
 		json = formatJson(request)
-		if json.len() > 1000 then
-			json = "large request showing first 1000 characters: " + json.left(1000) + "..."
+		length = json.len()
+		if length > 1000 then
+			json = "large request showing first 1000 characters (" + length.toStr() + " total) of  json: " + json.left(1000) + "..."
 		end if
 
 		RTA_logDebug("Received request: ", json)
@@ -190,162 +192,6 @@ function processGetFocusedNodeRequest(request as Object) as Object
 	return result
 end function
 
-function processConvertKeyPathToSceneKeyPath(request as Object) as Object
-	args = request.args
-
-	result = processGetValueRequest(args)
-	if RTA_isErrorObject(result) then
-		return result
-	end if
-
-	if result.found <> true then
-		return RTA_buildErrorResponseObject("No value found at key path '" + RTA_getStringAtKeyPath(args, "keyPath") + "'")
-	end if
-
-	node = result.value
-	if NOT RTA_isNode(node) then
-		return RTA_buildErrorResponseObject("Value at key path '" + RTA_getStringAtKeyPath(args, "keyPath") + "' was not a node")
-	end if
-
-	keyPathParts = []
-
-	' If we found the matching node then we are going to walk up the tree to build the scene key path. If we don't end up with scene at the top then then we know we didn't succeed
-	while true
-		parent = node.getParent()
-		if parent <> invalid then
-			nodeId = node.id
-			if nodeId <> "" then
-				keyPathParts.unshift("#" + nodeId)
-			else
-				position = RTA_getNodeParentIndex(node, parent)
-				keyPathParts.unshift(position.toStr())
-			end if
-
-			' If this is a child of global then we need to not continue as global will return the Scene when getParent is called but it won't be a valid key path
-			if m.global.isSameNode(node) then
-				exit while
-			end if
-
-			node = parent
-		else
-			' If we got to the top and the node is a scene then we can return the key path
-			if node.isSubtype("Scene") then
-				' One final check, we want to see if we have an arrayGridChildElementId that we also need to resolve
-				arrayGridChildElementId = args.arrayGridChildElementId
-				if RTA_isNonEmptyString(arrayGridChildElementId) then
-					result = generateArrayGridChildKeyPath(arrayGridChildElementId)
-					if RTA_isErrorObject(result) then
-						return result
-					end if
-
-					keyPathParts.push(result)
-				end if
-
-				keyPath = keyPathParts.join(".")
-
-				return {
-					"base": "scene"
-					"keyPath": keyPath
-				}
-			else
-				exit while
-			end if
-		end if
-	end while
-
-	' If we got to the top and the node is not a scene then we can't convert it to a scene key path
-	return RTA_buildErrorResponseObject("Could not convert key path to scene key path as the node was not a child of the Scene")
-end function
-
-function generateArrayGridChildKeyPath(arrayGridChildElementId)
-		result = processGetValueRequest({
-			"base": "elementId"
-			"keyPath": arrayGridChildElementId
-		})
-
-		if RTA_isErrorObject(result) then
-			return result
-		end if
-
-		if result.found <> true then
-			return RTA_buildErrorResponseObject("Could not get base for elementId request. Not found")
-		end if
-
-		arrayGridChild = result.value
-		if NOT RTA_isNode(arrayGridChild) then
-			return RTA_buildErrorResponseObject("Could not get base for elementId request. Not a node")
-		end if
-
-		itemPosition = []
-		arrayGridKeyPathParts = []
-		currentContentNode = invalid
-
-		while true
-			' Have to walk up the tree to build our key path.
-			if currentContentNode <> invalid then
-				' If we have reached the itemContent then we need to create the starting key path part
-				contentNodeParent = currentContentNode.getParent()
-
-				if contentNodeParent = invalid then
-					RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as currentContentNode parent was invalid")
-				else if contentNodeParent.isSubtype("ArrayGrid") = true then
-					if contentNodeParent.isSubtype("RowList") = true then
-						' If it's a RowList and we have one itemPosition then this is a title key path
-						if itemPosition.count() = 1 then
-							arrayGridKeyPathParts.unshift(itemPosition[0].toStr() + ".title")
-						else if itemPosition.count() = 2 then
-							arrayGridKeyPathParts.unshift(itemPosition[0].toStr() + ".items." + itemPosition[1].toStr())
-						else
-							return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as itemPosition had unexpected number of parts for RowList")
-						end if
-					else
-						if itemPosition.count() = 1 then
-							arrayGridKeyPathParts.unshift(itemPosition[0].toStr())
-						else
-							return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as itemPosition had unexpected number of parts for ArrayGrid")
-						end if
-					end if
-
-					return arrayGridKeyPathParts.join(".")
-				end if
-
-				index = RTA_getNodeParentIndex(currentContentNode, contentNodeParent)
-				if index = -1 then
-					return RTA_buildErrorResponseObject("Could not find itemContent parent index")
-				end if
-
-				itemPosition.unshift(index)
-				currentContentNode = contentNodeParent
-			else if arrayGridChild.hasField("itemContent") then
-				' Putting as the second logic gate instead of first to prevent getting triggered after after currentContentNode has been set
-				if arrayGridChild.itemContent = invalid then
-					return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as itemContent was invalid")
-				end if
-
-				currentContentNode = arrayGridChild.itemContent
-			else
-				if arrayGridChild.id <> "" then
-					arrayGridKeyPathParts.unshift("#" + arrayGridChild.id)
-				else
-					index = RTA_getNodeParentIndex(arrayGridChild, arrayGridChild.getParent())
-					if index = -1 then
-						return RTA_buildErrorResponseObject("Could not find ArrayGrid child parent index")
-					end if
-
-					arrayGridKeyPathParts.unshift(index.toStr())
-				end if
-
-				arrayGridChild = arrayGridChild.getParent()
-
-				if arrayGridChild = invalid then
-					return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path")
-				end if
-			end if
-		end while
-
-		return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path")
-end function
-
 function processGetValueRequest(request as Object) as Object
 	if request.args = Invalid then
 		' Allows us to use this same functionality in other requests
@@ -451,6 +297,43 @@ function processGetNodesInfoRequest(request as Object) as Object
 			"fields": fields
 			"children": children
 		}
+	end for
+
+	return {
+		"results": results
+	}
+end function
+
+function processGetChildrenByElementIdRequest(request as Object) as Object
+	args = request.args
+	elementIds = args.requests
+	if NOT RTA_isNonEmptyArray(elementIds) then
+		return RTA_buildErrorResponseObject("getChildrenByElementId requires a non-empty requests array of elementIds")
+	end if
+
+	allNodes = m.top.getAll()
+
+	results = {}
+	for each elementId in elementIds
+		foundNode = invalid
+		for each node in allNodes
+			if node.getUIElementId() = elementId then
+				foundNode = node
+				exit for
+			end if
+		end for
+
+		children = []
+		if foundNode <> invalid AND NOT foundNode.isSubtype("ArrayGrid") then
+			for each child in foundNode.getChildren(-1, 0)
+				children.push({
+					"subtype": child.subtype()
+					"id": child.id
+					"uiElementId": child.getUIElementId()
+				})
+			end for
+		end if
+		results[elementId] = children
 	end for
 
 	return {
@@ -893,49 +776,6 @@ function processAssignElementIdOnAllNodesRequest(request as Object) as Object
 	return result
 end function
 
-' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
-function addNodeToTree(storedNodes as Object, flatTree as Object, node as Object, parentRef = -1 as Integer, position = -1 as Integer, sequestered = false as Boolean) as Object
-	currentNodeReference = storedNodes.count()
-	storedNodes.push(node)
-
-	nodeSubtype = node.subtype()
-	nodeBranch = {
-		"subtype": nodeSubtype
-		"id": node.id
-		"ref": currentNodeReference
-		"parentRef": parentRef
-		"position": position
-	}
-
-	if sequestered then
-		nodeBranch.sequestered = true
-	end if
-
-	' Only add the following fields if we extend from Group. Note node.isSubtype("Group") returns false if called on a Group node. This necessitates the second check.
-	if node.isSubtype("Group") OR nodeSubtype = "Group" then
-		nodeBranch.visible = node.visible
-		nodeBranch.opacity = node.opacity
-		nodeBranch.translation = node.translation
-	end if
-
-	flatTree.push(nodeBranch)
-
-	return nodeBranch
-end function
-
-' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
-function buildTreeCore(storedNodes as Object, flatTree as Object, node as Object, searchForArrayGrids as Boolean, arrayGridNodes = {} as Object, parentRef = -1 as Integer, position = -1 as Integer, sequestered = false as Boolean) as Object
-	nodeBranch = addNodeToTree(storedNodes, flatTree, node, parentRef, position, sequestered)
-
-	childPosition = 0
-	for each childNode in node.getChildren(-1, 0)
-		buildTreeCore(storedNodes, flatTree, childNode, searchForArrayGrids, arrayGridNodes, nodeRef, childPosition)
-		childPosition++
-	end for
-
-	return nodeBranch
-end function
-
 function processGetNodesWithPropertiesRequest(request as Object) as Object
 	args = request.args
 	nodeRefKey = args.nodeRefKey
@@ -1180,34 +1020,6 @@ function processSetSettingsRequest(request as Object) as Object
 	return {}
 end function
 
-function processBuildTreeRequest(request as Object) as Object
-	args = request.args
-	includeArrayGridChildren = RTA_getBooleanAtKeyPath(args, "includeArrayGridChildren")
-	includeBoundingRectInfo = RTA_getBooleanAtKeyPath(args, "includeBoundingRectInfo")
-
-	storedNodes = []
-	flatTree = []
-	scene = m.top.getScene()
-	buildTreeCore(storedNodes, flatTree, scene, includeArrayGridChildren)
-
-	if includeBoundingRectInfo then
-		for each nodeTree in flatTree
-			node = storedNodes[nodeTree.ref]
-			if nodeTree.rect = Invalid AND nodeTree.sceneRect = Invalid AND nodeTree.sequestered <> true then
-				nodeTree["sceneRect"] = node.sceneBoundingRect()
-			end if
-		end for
-
-		if m.currentDesignResolution = invalid then
-			m.currentDesignResolution = scene.currentDesignResolution
-		end if
-	end if
-
-	return {
-		"flatTree": flatTree
-	}
-end function
-
 ' Returns 0 if no, 1 if yes and -1 if the comparison isn't possible on the current type
 function doesNodeHaveProperty(node as Object, property as Object) as Integer
 	result = 0
@@ -1401,7 +1213,7 @@ end function
 
 
 
-' Code to remove in 3.0
+' All code below will be removed in 3.0
 
 ' Remove in 3.0
 ' ArrayGrid children can't be built with a normal call to buildTree since you can only get the parent not the children.
@@ -1613,6 +1425,37 @@ sub buildItemComponentTrees(storedNodes as Object, flatTree as Object, itemCompo
 		end for
 	end for
 end sub
+
+' Remove in 3.0
+' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
+function addNodeToTree(storedNodes as Object, flatTree as Object, node as Object, parentRef = -1 as Integer, position = -1 as Integer, sequestered = false as Boolean) as Object
+	currentNodeReference = storedNodes.count()
+	storedNodes.push(node)
+
+	nodeSubtype = node.subtype()
+	nodeBranch = {
+		"subtype": nodeSubtype
+		"id": node.id
+		"ref": currentNodeReference
+		"parentRef": parentRef
+		"position": position
+	}
+
+	if sequestered then
+		nodeBranch.sequestered = true
+	end if
+
+	' Only add the following fields if we extend from Group. Note node.isSubtype("Group") returns false if called on a Group node. This necessitates the second check.
+	if node.isSubtype("Group") OR nodeSubtype = "Group" then
+		nodeBranch.visible = node.visible
+		nodeBranch.opacity = node.opacity
+		nodeBranch.translation = node.translation
+	end if
+
+	flatTree.push(nodeBranch)
+
+	return nodeBranch
+end function
 
 ' Remove in 3.0
 ' @sequestered - boolean to let us know if this is a non item component child of an ArrayGrid so we have to treat it differently
@@ -1866,4 +1709,162 @@ function processStoreNodeReferencesRequest(request as Object) as Object
 	m.nodeReferences[nodeRefKey] = storedNodes
 
 	return result
+end function
+
+' Remove in 3.0
+function processConvertKeyPathToSceneKeyPath(request as Object) as Object
+	args = request.args
+
+	result = processGetValueRequest(args)
+	if RTA_isErrorObject(result) then
+		return result
+	end if
+
+	if result.found <> true then
+		return RTA_buildErrorResponseObject("No value found at key path '" + RTA_getStringAtKeyPath(args, "keyPath") + "'")
+	end if
+
+	node = result.value
+	if NOT RTA_isNode(node) then
+		return RTA_buildErrorResponseObject("Value at key path '" + RTA_getStringAtKeyPath(args, "keyPath") + "' was not a node")
+	end if
+
+	keyPathParts = []
+
+	' If we found the matching node then we are going to walk up the tree to build the scene key path. If we don't end up with scene at the top then then we know we didn't succeed
+	while true
+		parent = node.getParent()
+		if parent <> invalid then
+			nodeId = node.id
+			if nodeId <> "" then
+				keyPathParts.unshift("#" + nodeId)
+			else
+				position = RTA_getNodeParentIndex(node, parent)
+				keyPathParts.unshift(position.toStr())
+			end if
+
+			' If this is a child of global then we need to not continue as global will return the Scene when getParent is called but it won't be a valid key path
+			if m.global.isSameNode(node) then
+				exit while
+			end if
+
+			node = parent
+		else
+			' If we got to the top and the node is a scene then we can return the key path
+			if node.isSubtype("Scene") then
+				' One final check, we want to see if we have an arrayGridChildElementId that we also need to resolve
+				arrayGridChildElementId = args.arrayGridChildElementId
+				if RTA_isNonEmptyString(arrayGridChildElementId) then
+					result = generateArrayGridChildKeyPath(arrayGridChildElementId)
+					if RTA_isErrorObject(result) then
+						return result
+					end if
+
+					keyPathParts.push(result)
+				end if
+
+				keyPath = keyPathParts.join(".")
+
+				return {
+					"base": "scene"
+					"keyPath": keyPath
+				}
+			else
+				exit while
+			end if
+		end if
+	end while
+
+	' If we got to the top and the node is not a scene then we can't convert it to a scene key path
+	return RTA_buildErrorResponseObject("Could not convert key path to scene key path as the node was not a child of the Scene")
+end function
+
+' Remove in 3.0
+function generateArrayGridChildKeyPath(arrayGridChildElementId)
+		result = processGetValueRequest({
+			"base": "elementId"
+			"keyPath": arrayGridChildElementId
+		})
+
+		if RTA_isErrorObject(result) then
+			return result
+		end if
+
+		if result.found <> true then
+			return RTA_buildErrorResponseObject("Could not get base for elementId request. Not found")
+		end if
+
+		arrayGridChild = result.value
+		if NOT RTA_isNode(arrayGridChild) then
+			return RTA_buildErrorResponseObject("Could not get base for elementId request. Not a node")
+		end if
+
+		itemPosition = []
+		arrayGridKeyPathParts = []
+		currentContentNode = invalid
+
+		while true
+			' Have to walk up the tree to build our key path.
+			if currentContentNode <> invalid then
+				' If we have reached the itemContent then we need to create the starting key path part
+				contentNodeParent = currentContentNode.getParent()
+
+				if contentNodeParent = invalid then
+					RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as currentContentNode parent was invalid")
+				else if contentNodeParent.isSubtype("ArrayGrid") = true then
+					if contentNodeParent.isSubtype("RowList") = true then
+						' If it's a RowList and we have one itemPosition then this is a title key path
+						if itemPosition.count() = 1 then
+							arrayGridKeyPathParts.unshift(itemPosition[0].toStr() + ".title")
+						else if itemPosition.count() = 2 then
+							arrayGridKeyPathParts.unshift(itemPosition[0].toStr() + ".items." + itemPosition[1].toStr())
+						else
+							return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as itemPosition had unexpected number of parts for RowList")
+						end if
+					else
+						if itemPosition.count() = 1 then
+							arrayGridKeyPathParts.unshift(itemPosition[0].toStr())
+						else
+							return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as itemPosition had unexpected number of parts for ArrayGrid")
+						end if
+					end if
+
+					return arrayGridKeyPathParts.join(".")
+				end if
+
+				index = RTA_getNodeParentIndex(currentContentNode, contentNodeParent)
+				if index = -1 then
+					return RTA_buildErrorResponseObject("Could not find itemContent parent index")
+				end if
+
+				itemPosition.unshift(index)
+				currentContentNode = contentNodeParent
+			else if arrayGridChild.hasField("itemContent") then
+				' Putting as the second logic gate instead of first to prevent getting triggered after after currentContentNode has been set
+				if arrayGridChild.itemContent = invalid then
+					return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path as itemContent was invalid")
+				end if
+
+				currentContentNode = arrayGridChild.itemContent
+			else
+				if arrayGridChild.id <> "" then
+					arrayGridKeyPathParts.unshift("#" + arrayGridChild.id)
+				else
+					index = RTA_getNodeParentIndex(arrayGridChild, arrayGridChild.getParent())
+					if index = -1 then
+						return RTA_buildErrorResponseObject("Could not find ArrayGrid child parent index")
+					end if
+
+					arrayGridKeyPathParts.unshift(index.toStr())
+				end if
+
+				arrayGridChild = arrayGridChild.getParent()
+
+				if arrayGridChild = invalid then
+					return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path")
+				end if
+			end if
+		end while
+
+		return RTA_buildErrorResponseObject("Could not convert arrayGridChildElementId to a key path")
 end function

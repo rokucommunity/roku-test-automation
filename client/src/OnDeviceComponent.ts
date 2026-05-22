@@ -160,6 +160,24 @@ export class OnDeviceComponent {
 	}
 
 	/**
+	 * Gets the immediate children (id, subtype, uiElementId) for multiple nodes looked up by elementId.
+	 * ArrayGrid subtypes (RowList, MarkupGrid, etc.) return an empty array since their internal
+	 * children don't match what app-ui returns.
+	 */
+	public async getChildrenByElementId(args: ODC.GetChildrenByElementIdArgs, options: ODC.RequestOptions = {}) {
+		const result = await this.sendRequest(ODC.RequestType.getChildrenByElementId, args, options);
+		return result.json as {
+			results: {
+				[elementId: string]: {
+					subtype: string;
+					id: string;
+					uiElementId: string;
+				}[]
+			}
+		} & ODC.ReturnTimeTaken;
+	}
+
+	/**
 	 * Gets detailed information about multiple nodes including their subtypes, fields, and children
 	 */
 	public async getNodesInfo(args: ODC.GetNodesInfoArgs, options: ODC.RequestOptions = {}) {

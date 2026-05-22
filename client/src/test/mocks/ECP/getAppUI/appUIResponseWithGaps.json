@@ -1,0 +1,148 @@
+{
+	"name": "app-ui",
+	"value": "",
+	"attributes": {},
+	"children": [
+		{
+			"name": "status",
+			"value": "OK",
+			"attributes": {},
+			"children": []
+		},
+		{
+			"name": "topscreen",
+			"value": "",
+			"attributes": {},
+			"children": [
+				{
+					"name": "plugin",
+					"value": "",
+					"attributes": {
+						"id": "dev",
+						"name": "TestChannel"
+					},
+					"children": []
+				},
+				{
+					"name": "screen",
+					"value": "",
+					"attributes": {
+						"type": "SGScreen",
+						"focused": "true"
+					},
+					"children": [
+						{
+							"name": "GapTestScene",
+							"value": "",
+							"attributes": {
+								"children": "3",
+								"extends": "Scene",
+								"focused": "true",
+								"focusable": "true",
+								"rcid": "0",
+								"uiElementId": "RTA_1",
+								"bounds": "{0, 0, 1920, 1080}"
+							},
+							"children": [
+								{
+									"name": "RenderableNode",
+									"value": "",
+									"attributes": {
+										"children": "5",
+										"name": "containerGroup",
+										"rcid": "0",
+										"uiElementId": "RTA_2",
+										"bounds": "{0, 0, 1920, 1080}",
+										"index": "0"
+									},
+									"children": [
+										{
+											"name": "Rectangle",
+											"value": "",
+											"attributes": {
+												"name": "rect1",
+												"rcid": "0",
+												"uiElementId": "RTA_3",
+												"bounds": "{0, 0, 100, 100}",
+												"color": "#ff0000ff",
+												"index": "0"
+											},
+											"children": []
+										},
+										{
+											"name": "Poster",
+											"value": "",
+											"attributes": {
+												"name": "poster1",
+												"rcid": "0",
+												"uiElementId": "RTA_5",
+												"bounds": "{200, 0, 100, 100}",
+												"index": "1"
+											},
+											"children": []
+										},
+										{
+											"name": "Label",
+											"value": "",
+											"attributes": {
+												"name": "label1",
+												"rcid": "0",
+												"uiElementId": "RTA_7",
+												"bounds": "{400, 0, 200, 50}",
+												"text": "Hello",
+												"color": "#ffffffff",
+												"index": "2"
+											},
+											"children": []
+										}
+									]
+								},
+								{
+									"name": "RenderableNode",
+									"value": "",
+									"attributes": {
+										"children": "3",
+										"name": "nestedGapGroup",
+										"rcid": "0",
+										"uiElementId": "RTA_8",
+										"bounds": "{0, 200, 500, 200}",
+										"index": "1"
+									},
+									"children": [
+										{
+											"name": "Rectangle",
+											"value": "",
+											"attributes": {
+												"name": "nestedRect",
+												"rcid": "0",
+												"uiElementId": "RTA_9",
+												"bounds": "{0, 0, 50, 50}",
+												"color": "#00ff00ff",
+												"index": "0"
+											},
+											"children": []
+										}
+									]
+								},
+								{
+									"name": "Rectangle",
+									"value": "",
+									"attributes": {
+										"name": "noGapRect",
+										"rcid": "0",
+										"uiElementId": "RTA_12",
+										"bounds": "{0, 500, 100, 100}",
+										"color": "#0000ffff",
+										"children": "0",
+										"index": "2"
+									},
+									"children": []
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

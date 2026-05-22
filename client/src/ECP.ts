@@ -5,6 +5,7 @@ import type { ConfigOptions } from './types/ConfigOptions';
 import { utils } from './utils';
 import type { MediaPlayerResponse } from './types/MediaPlayerResponse';
 import type { AppUIResponse, AppUIResponseChild } from './types/AppUIResponse';
+import type { OnDeviceComponent } from './OnDeviceComponent';
 
 export enum Key {
 	Back = 'Back',
@@ -300,9 +301,16 @@ export class ECP {
 	}
 
 	/**
-	 * Gets the App UI tree from the device, providing detailed information about the currently displayed UI elements. Note that nodes that are not renderable on screen such as Task, Timer, Animation, etc will not show up here so care must be taken when using index positions if you have any of these nodes in your node tree.
+	 * Gets the App UI tree from the device, providing detailed information about the currently displayed UI elements.
+	 * When an OnDeviceComponent instance is provided, non-renderable nodes (Task, Timer, Animation, etc.) that are
+	 * excluded from the ECP response will be filled in via ODC, and all key paths will use scene base with correct indices.
+	 * Without ODC, key paths use appUI base and non-renderable nodes are not included.
 	 */
-	public async getAppUI() {
+	public async getAppUI(odc?: OnDeviceComponent) {
+		if (odc) {
+			await odc.assignElementIdOnAllNodes({});
+		}
+
 		const result = await this.device.sendEcpGet(`query/app-ui`);
 
 		const children = result.body?.children;
@@ -325,14 +333,58 @@ export class ECP {
 		sceneNode.base = 'scene';
 		sceneNode.keyPath = '';
 
-		if (sceneNode.children) {
-			for (const [position, child] of sceneNode.children.entries()) {
-				this.generateKeyPathsFromAppUIResponse(child, { position: position });
+		if (odc) {
+			await this.fillGapChildren(odc, sceneNode);
+			this.regenerateSceneKeyPaths(sceneNode);
+		} else {
+			if (sceneNode.children) {
+				for (const [position, child] of sceneNode.children.entries()) {
+					this.generateKeyPathsFromAppUIResponse(child, { position: position });
+				}
 			}
 		}
 
 		this.calculateSceneBoundingRects(sceneNode);
 		return response;
+	}
+
+	private async fillGapChildren(odc: OnDeviceComponent, sceneNode: AppUIResponseChild) {
+		const gapParents = this.findGapParents(sceneNode);
+		if (gapParents.length === 0) {
+			return;
+		}
+
+		const elementIds = gapParents.map(parent => parent.uiElementId);
+
+		try {
+			const { results } = await odc.getChildrenByElementId({
+				requests: elementIds
+			});
+
+			for (const gapParent of gapParents) {
+				const children = results[gapParent.uiElementId];
+				if (children?.length > 0) {
+					this.mergeGapChildren(gapParent, children);
+				}
+			}
+		} catch (e) {
+			console.error('Failed to fill gap children:', e);
+		}
+	}
+
+	private regenerateSceneKeyPaths(sceneNode: AppUIResponseChild) {
+		this.clearKeyPaths(sceneNode);
+
+		for (const [position, child] of (sceneNode.children ?? []).entries()) {
+			this.generateSceneKeyPaths(child, { position: position });
+		}
+	}
+
+	private clearKeyPaths(node: AppUIResponseChild) {
+		for (const child of node.children ?? []) {
+			child.keyPath = '';
+			this.clearKeyPaths(child);
+		}
 	}
 
 	private convertChildrenForGetAppUI(children: any[], parentIsRowListItem = false) {
@@ -374,6 +426,11 @@ export class ECP {
 				...child.attributes,
 				subtype: child.name == 'RenderableNode' ? 'Group' : child.name,
 			};
+
+			const totalChildren = child.attributes.children;
+			if (totalChildren !== undefined) {
+				childResponse.totalChildren = +totalChildren;
+			}
 
 			if (Array.isArray(child.children) && child.children.length > 0) {
 				childResponse.children = this.convertChildrenForGetAppUI(child.children ?? [], child.name == 'RowListItem');
@@ -514,6 +571,152 @@ export class ECP {
 
 			this.generateKeyPathsFromAppUIResponse(childNode, keyPathContext, currentNodeKeyPathParts);
 		}
+	}
+
+	/**
+	 * Generates scene-base key paths for the complete tree (after gap-filling).
+	 * Uses #id where available, index positions otherwise. Since the tree now includes
+	 * all children (including non-renderable), index-based paths are correct.
+	 * Non-renderable nodes get scene-base index paths like any other node.
+	 */
+	public generateSceneKeyPaths(node: AppUIResponseChild, keyPathContext: {
+		position: number;
+		duplicateIdsFound?: boolean;
+		parent?: AppUIResponseChild;
+	}, keyPathParts: string[] = []) {
+		const currentNodeKeyPathParts = [...keyPathParts];
+		let addKeyPath = !node.keyPath;
+
+		if (node.subtype == 'RowListItem') {
+			addKeyPath = false;
+			currentNodeKeyPathParts.push(keyPathContext.position.toString());
+		} else if (keyPathContext.parent?.subtype == 'RowListItem') {
+			addKeyPath = false;
+
+			if (keyPathContext.position == 0) {
+				currentNodeKeyPathParts.push('title');
+
+				if (node.subtype == 'Label') {
+					addKeyPath = true;
+				} else {
+					const child = node.children?.[0];
+					if (child) {
+						node.base = 'scene';
+						child.keyPath = currentNodeKeyPathParts.join('.');
+					}
+				}
+			} else if (node.subtype === 'MarkupGrid') {
+				currentNodeKeyPathParts.push('items');
+			}
+		} else if (addKeyPath && node.id && !keyPathContext.duplicateIdsFound) {
+			currentNodeKeyPathParts.push(`#${node.id}`);
+		} else if (addKeyPath) {
+			currentNodeKeyPathParts.push(keyPathContext.position.toString());
+		}
+
+		if (addKeyPath) {
+			node.base = 'scene';
+			node.keyPath = currentNodeKeyPathParts.join('.');
+		}
+
+		const children = node.children ?? [];
+		for (const [childPosition, childNode] of children.entries()) {
+			const duplicateIds = children.filter((child, index) => {
+				if (child.id) {
+					if (child.id == childNode.id && index != childPosition) {
+						return true;
+					}
+				}
+				return false;
+			});
+
+			keyPathContext = {
+				position: childPosition,
+				parent: node,
+				duplicateIdsFound: duplicateIds.length > 0,
+			};
+
+			this.generateSceneKeyPaths(childNode, keyPathContext, currentNodeKeyPathParts);
+		}
+	}
+
+	/**
+	 * Finds all nodes in the tree that have more children on the device than are returned in the app-ui response.
+	 * Returns an array of nodes that need gap-filling, each with a uiElementId that can be used to request full children info.
+	 * The scene node (keyPath === '') is always included because ECP never reports the correct children count for it.
+	 */
+	public findGapParents(node: AppUIResponseChild): (AppUIResponseChild & { uiElementId: string })[] {
+		const gapParents: (AppUIResponseChild & { uiElementId: string })[] = [];
+
+		const uiElementId = node.uiElementId;
+		if (uiElementId) {
+			const isSceneNode = node.keyPath === '';
+			const hasChildGap = node.totalChildren !== undefined && node.totalChildren > (node.children?.length ?? 0);
+			if (isSceneNode || hasChildGap) {
+				gapParents.push(node as AppUIResponseChild & { uiElementId: string });
+			}
+		}
+
+		for (const child of node.children ?? []) {
+			gapParents.push(...this.findGapParents(child));
+		}
+
+		return gapParents;
+	}
+
+	/**
+	 * Merges non-Group children into the app-ui tree for nodes that have missing children.
+	 * Matches app-ui children to the full children list using id, then uiElementId as fallback for position correlation.
+	 * Non-renderable children are inserted at their correct index positions.
+	 * @param gapParent The app-ui node that has missing children
+	 * @param fullChildrenList The complete list of children from getNodesChildren
+	 */
+	public mergeGapChildren(gapParent: AppUIResponseChild, fullChildrenList: { subtype: string; id?: string; uiElementId?: string }[]) {
+		const appUIChildren = gapParent.children ?? [];
+
+		// Build a lookup of app-ui children by id for fast matching
+		const appUIById = new Map<string, AppUIResponseChild>();
+		for (const child of appUIChildren) {
+			if (child.id) {
+				appUIById.set(child.id, child);
+			}
+		}
+
+		// Also index by uiElementId as a secondary matching strategy
+		const appUIByElementId = new Map<string, AppUIResponseChild>();
+		for (const child of appUIChildren) {
+			if (child.uiElementId) {
+				appUIByElementId.set(child.uiElementId, child);
+			}
+		}
+
+		const merged: AppUIResponseChild[] = [];
+		const consumed = new Set<AppUIResponseChild>();
+
+		for (const realChild of fullChildrenList) {
+			// Try matching by id first (stable across reboots)
+			let match = (realChild.id) ? appUIById.get(realChild.id) : undefined;
+
+			// Fall back to uiElementId matching for position correlation
+			if (!match && realChild.uiElementId) {
+				match = appUIByElementId.get(realChild.uiElementId);
+			}
+
+			if (match && !consumed.has(match)) {
+				consumed.add(match);
+				merged.push(match);
+			} else {
+				merged.push({
+					base: 'scene',
+					keyPath: '',
+					subtype: realChild.subtype,
+					id: realChild.id,
+					uiElementId: realChild.uiElementId
+				} as AppUIResponseChild);
+			}
+		}
+
+		gapParent.children = merged;
 	}
 
 	private convertAppUiArray(input?: string, fallback?: number[]) {
