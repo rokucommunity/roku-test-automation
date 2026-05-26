@@ -21,14 +21,14 @@
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/triwav/roku-test-automation.git"
+        "url": "https://github.com/rokucommunity/roku-test-automation"
     },
     "author": "",
     "license": "MIT",
     "bugs": {
-        "url": "https://github.com/triwav/roku-test-automation/issues"
+        "url": "https://github.com/rokucommunity/roku-test-automation/issues"
     },
-    "homepage": "https://github.com/triwav/roku-test-automation#readme",
+    "homepage": "https://github.com/rokucommunity/roku-test-automation#readme",
     "dependencies": {
         "@suitest/types": "^4.6.0",
         "@types/express": "^5.0.0",

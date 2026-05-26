@@ -1,5 +1,5 @@
 {
-    "$schema": "https://raw.githubusercontent.com/triwav/roku-test-automation/master/client/rta-config.schema.json",
+    "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/client/rta-config.schema.json",
     "RokuDevice": {
         "devices": [
             {
