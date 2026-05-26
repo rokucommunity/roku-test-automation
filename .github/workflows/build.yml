@@ -11,6 +11,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: client
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-node@master
@@ -20,6 +23,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lint
+      - run: npm run validate-client
       - run: npm run test
       - name: Upload coverage to Coveralls
         if: matrix.os == 'ubuntu-latest'
@@ -28,6 +32,4 @@ jobs:
           #hardcode the coveralls token...it's not overly important to protect, and github actions won't allow forks to work with coveralls otherwise
           COVERALLS_REPO_TOKEN: "F6lSsESQszSbdnLURxBkCbj7gE5uZKTaz"
         with:
-          path-to-lcov: ./coverage/lcov.info
-      # this is stalling out for some reason, so disable it for now
-      #- run: npm run test-related-projects
+          path-to-lcov: ./client/coverage/lcov.info
