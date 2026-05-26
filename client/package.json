@@ -30,7 +30,6 @@
     },
     "homepage": "https://github.com/triwav/roku-test-automation#readme",
     "dependencies": {
-        "@suitest/types": "^4.6.0",
         "@types/express": "^5.0.0",
         "ajv": "^6.12.6",
         "express": "^4.21.2",
