@@ -26,7 +26,7 @@ jobs:
         uses: coverallsapp/github-action@v2
         env:
           #hardcode the coveralls token...it's not overly important to protect, and github actions won't allow forks to work with coveralls otherwise
-          COVERALLS_REPO_TOKEN: "kVPcGJfehOArEQnHb8BT3KS72xbUQCoxI"
+          COVERALLS_REPO_TOKEN: "F6lSsESQszSbdnLURxBkCbj7gE5uZKTaz"
         with:
           path-to-lcov: ./coverage/lcov.info
       # this is stalling out for some reason, so disable it for now
