@@ -6,7 +6,8 @@
     "typings": "client/dist/index.d.ts",
     "scripts": {
         "preversion": "npm run build && npm run lint && npm run test && npm run validate-client",
-        "build": "rm -f tsconfig.tsbuildinfo && rimraf dist && tsc",
+        "build": "npm run clean && tsc",
+        "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
         "lint": "eslint \"./src/**/*.ts\"",
         "test": "nyc mocha \"./src/**/*.spec.ts\" --ignore \"./src/**/*.device.spec.ts\"",
         "test:device": "mocha \"./src/**/*.device.spec.ts\"",
@@ -63,7 +64,6 @@
         "eslint": "^8.14.0",
         "mocha": "^10.2.0",
         "nyc": "^14.1.1",
-        "rimraf": "^2.7.1",
         "sinon": "^7.2.3",
         "source-map-support": "^0.5.21",
         "ts-node": "^8.8.2",
