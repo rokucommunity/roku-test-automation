@@ -21,6 +21,10 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
+	after(async () => {
+		await odc.shutdown();
+	});
+
 	describe('getAllCount', function () {
 		it('should have the correct fields and return a known node subtype', async () => {
 			const { totalNodes, nodeCountByType } = await odc.getAllCount();
