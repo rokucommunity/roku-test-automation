@@ -1,6 +1,7 @@
 # Roku Test Automation
 
 - [Intro](#intro)
+- [v3.0 Changes](#v30-changes)
 - [v2.0 Changes](#v20-changes)
 - [Integration](#integration)
 - [Components](#components)
@@ -18,8 +19,6 @@
     - [`getNodesWithProperties`](#getnodeswithproperties)
     - [`getAllCount`](#getallcount)
     - [`getRootsCount`](#getrootscount)
-    - [`storeNodeReferences`](#storenodereferences)
-    - [`deleteNodeReferences`](#deletenodereferences)
     - [`disableScreenSaver`](#disablescreensaver)
     - [`readRegistry`](#readregistry)
     - [`writeRegistry`](#writeregistry)
@@ -40,6 +39,19 @@ Roku Test Automation (RTA from here on out) helps with automating functional tes
 ## Contributing & Getting Help
 
 There is always more things that we would like to add than we have time for. If you would like to help contribute the best spot to reach out is in the [Roku Developers Slack](https://join.slack.com/t/rokudevelopers/shared_invite/zt-4vw7rg6v-NH46oY7hTktpRIBM_zGvwA). (We're in the #rta channel). If you are having trouble getting RTA working feel free to reach out there as well. If you see an issue or would like to see something added then feel free to [create a new Github Issue](https://github.com/triwav/roku-test-automation/issues/new)
+
+## v3.0 Changes
+
+Some incompatibility changes were made in v3.0. These include:
+
+- The `appUI` base type has been removed. The ECP `/query/app-ui` endpoint excludes non-renderable nodes (Timer, Task, Animation, etc.), which made index-based key paths unreliable. `getAppUI` now uses ODC to fill in missing nodes, so all key paths use the `scene` base directly.
+- The `nodeRef` base type and `storeNodeReferences`/`deleteNodeReferences` have been removed. Use `scene` or `elementId` base types instead.
+- `getNodesWithProperties` no longer requires `storeNodeReferences` to be called first. It now iterates all nodes directly via `getAll()` and returns `uiElementId` on each matching node. The `nodeRefs` array has been removed from the response.
+- `convertKeyPathToSceneKeyPath` has been removed as it is no longer needed with scene-based key paths being generated directly.
+- `findNodesAtLocation` has been removed.
+- `startResponsivenessTesting`, `getResponsivenessTestingData`, and `stopResponsivenessTesting` have been removed.
+- `getServerHost` has been renamed to `getClientHost`.
+- `NodeRepresentation` now includes a `uiElementId` field for node identification.
 
 ## v2.0 Changes
 
@@ -148,12 +160,12 @@ and a copy of [`utils.sleep`](#sleep) that also includes a pause in your rasp fi
 
 ##### `getAppUI`
 
-> getAppUI(): [AppUIResponse](./client/src/types/AppUIResponse.ts)
+> getAppUI(odc: OnDeviceComponent): [AppUIResponse](./client/src/types/AppUIResponse.ts)
 
-Gets the App UI tree from the device, providing detailed information about the currently displayed UI elements. This is useful for understanding the current UI structure and is used internally by many OnDeviceComponent methods. Note that nodes that are not renderable on screen such as Task, Timer, Animation, etc will not show up here so care must be taken when using index positions if you have any of these nodes in your node tree.
+Gets the App UI tree from the device, providing detailed information about the currently displayed UI elements. Non-renderable nodes (Task, Timer, Animation, etc.) that are excluded from the ECP response are filled in via ODC, and all key paths use scene base with correct indices.
 
 ```ts
-const appUI = await ecp.getAppUI();
+const appUI = await ecp.getAppUI(odc);
 console.log('UI elements:', appUI.screen.children);
 ```
 
@@ -198,7 +210,7 @@ Once setup you can send requests to the device to either kick off an event or ch
 
 At the heart of almost all requests internally is `getValue`. It serves as your entry point from which you execute other requests but can also be used by itself to return a requested value. `args` takes two properties:
 
-- `base?: string` can be either `global`, `scene`, `nodeRef` or `focusedNode`. If not supplied it defaults to `global`
+- `base?: string` can be either `global`, `scene`, `elementId` or `focusedNode`. If not supplied it defaults to `scene`
 - `keyPath?: string` builds off of the base and supplies the path to what you are interested in getting the value for. A simple example might be something like `AuthManager.isLoggedIn` which would let you check if a user is logged in or not. It can operate on much more than just keyed type fields though.
 
 Array's can access index positions `array.0.id`. Nodes can access their children `node.0.id` as well as find nodes with a given id `node.#idOfChildNodeToInspect`. The [`getValue` unit tests](./client/src/OnDeviceComponent.spec.ts#:~:text=%27getValue%27%2C%20function) provide a full list of what is possible for a key path.
@@ -210,7 +222,7 @@ await odc.getValue({
 });
 ```
 
-**NOTE** as of v2.0 `keyPath` can also call a number of the Roku Brightscript interface functions on the appropriately typed objects. Currently these include:
+**NOTE** `keyPath` can also call a number of the Roku Brightscript interface functions on the appropriately typed objects. Currently these include:
 
 - getParent()
 - count()
@@ -232,7 +244,7 @@ await odc.getValue({
 });
 ```
 
-As of v2.0 you can now access ArrayGrid children. To do this, we have added two special keywords in the keyPath: `items` and `title`. These don't actually exist at runtime, but RTA understands how to translate them into the proper lookup mechanisms on-device.
+You can also access ArrayGrid children. To do this, we have added two special keywords in the keyPath: `items` and `title`. These don't actually exist at runtime, but RTA understands how to translate them into the proper lookup mechanisms
 
 Here's an example showing how to access the 3rd item component in the second row:
 
@@ -264,7 +276,7 @@ await odc.getValue({
 
 This would retrieve the second item component in the grid.
 
-In addition as of v2.0 `keyPath` is no longer required if just accessing the base node
+`keyPath` is not required if just accessing the base node.
 
 #### `getValues`
 
@@ -279,19 +291,19 @@ The [`getValues` unit test](./client/src/OnDeviceComponent.spec.ts#:~:text=%27ge
 #### `getNodesInfo`
 
 > getNodesInfo(args: [ODC.GetNodesInfoArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetNodesInfoArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): results: {[key: string]: {
+				subtype: string;
+				fields: {
+					[key: string]: {
+						fieldType: string;
+						type: string;
+						value: any;
+					}
+				};
+				children: {
 					subtype: string;
-					fields: {
-						[key: string]: {
-							fieldType: string;
-							type: string;
-							value: any;
-						}
-					};
-					children: {
-						subtype: string;
-					}[]
-				}
+				}[]
 			}
+		}
 
 Sometimes it may be necessary to know the type of a field on a node. This is primarily used by the vscode extension for the SceneGraph Inspector but may be useful for external use as well.
 
@@ -360,12 +372,9 @@ await odc.setComponentGlobalAAKeyPath({
 
 #### `getFocusedNode`
 
-> getFocusedNode(args: [ODC.GetFocusedNodeArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetFocusedNodeArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {node?: NodeRepresentation, ref?: number, keyPath?: string, timeTaken: number}
+> getFocusedNode(args: [ODC.GetFocusedNodeArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetFocusedNodeArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {node?: NodeRepresentation, keyPath?: string, timeTaken: number}
 
-Gets the currently focused node. `args` includes the following:
-
-- `includeRef?: boolean` returns `ref` field in response that can be matched up with `storeNodeReferences` response for determining where we are in the node tree. Be sure to call storeNodeReferences first.
-- `key: string` Key that the references were stored on. If one isn't provided we use the automatically generated one
+Gets the currently focused node.
 
 ```ts
 let focusedNode = await odc.getFocusedNode();
@@ -424,9 +433,9 @@ to help distinguish if the observer actually fired the property `observerFired` 
 
 #### `getNodesWithProperties`
 
-> getNodesWithProperties(args: [ODC.GetNodesWithPropertiesArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20OnGetNodesWithPropertiesArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {nodes: ODC.NodeRepresentation[], nodeRefs, number[]}
+> getNodesWithProperties(args: [ODC.GetNodesWithPropertiesArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetNodesWithPropertiesArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {nodes: ODC.NodeRepresentation[]}
 
-If you are trying to find a node but are unsure of where it is in the tree you can use `getNodesWithProperties`. As an example, let's say you wanted to find all nodes with the a text field with the value of `Play Movie` you could do:
+If you are trying to find a node but are unsure of where it is in the tree you can use `getNodesWithProperties`. It iterates all nodes in the scene graph and returns those matching the specified property criteria. Each returned node includes a `uiElementId` that can be used with `base: 'elementId'` for follow-up operations. As an example, let's say you wanted to find all nodes with a text field with the value of `Play Movie` you could do:
 
 ```ts
 const result = await odc.getNodesWithProperties({
@@ -462,19 +471,11 @@ There are number of comparison operators that can be used:
 
 Assigns a unique element ID to all nodes in the scene graph. This is primarily used internally but can be useful for advanced node tracking.
 
-#### `findNodesAtLocation`
+#### `getChildrenByElementId`
 
-> findNodesAtLocation(args: [ODC.FindNodesAtLocationArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20FindNodesAtLocationArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {matches: TreeNode[]}
+> getChildrenByElementId(args: [ODC.GetChildrenByElementIdArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetChildrenByElementIdArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {results: {[elementId: string]: {subtype: string; id: string; uiElementId: string}[]}, timeTaken: number}
 
-Finds all visible nodes at a specific x,y screen coordinate. Returns nodes sorted by proximity to the specified point, with the closest match first.
-
-```ts
-const result = await odc.findNodesAtLocation({
-  x: 960,
-  y: 540
-});
-console.log('Nodes at center of screen:', result.matches);
-```
+Gets the immediate children (id, subtype, uiElementId) for multiple nodes looked up by elementId. ArrayGrid subtypes (RowList, MarkupGrid, etc.) return an empty array since their internal children don't match what app-ui returns. This is primarily used internally by `getAppUI` for gap-filling.
 
 #### `focusNode`
 
@@ -556,18 +557,6 @@ Returns both the total number of nodes as returned by `getAll()` on the field `t
 > getRootsCount(args: [ODC.GetRootsCountArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetRootsCountArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {totalNodes: number, nodeCountByType: {[key: string]: number}, timeTaken: number}
 
 Returns both the total number of nodes as returned by `getRoots()` on the field `totalNodes` as well as the total count of each node subtype on the field `nodeCountByType`.
-
-#### `storeNodeReferences`
-
-> storeNodeReferences(args: [ODC.StoreNodeReferencesArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20StoreNodeReferencesArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): [StoreNodeReferencesResponse](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20StoreNodeReferencesResponse)
-
-Creates a list of nodes in the currently running application by traversing the node tree. The returned node indexes can then be used as the base for other functions such as [getValue](#getvalue)
-
-#### `deleteNodeReferences`
-
-> deleteNodeReferences(args: [ODC.DeleteNodeReferencesArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20DeleteNodeReferencesArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {timeTaken: number}
-
-Deletes the list of nodes previously stored by [storeNodeReferences](#storenodereferences) on the specified key
 
 #### `readRegistry`
 
@@ -696,24 +685,24 @@ await odc.writeFile({
 
 #### `removeNodeChildren`
 
-> removeNodeChildren(args: [ODC.RemoveNodeChildrenArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%RemoveNodeChildrenArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {timeTaken: number}
+> removeNodeChildren(args: [ODC.RemoveNodeChildrenArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RemoveNodeChildrenArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {timeTaken: number}
 
 Allows removing children of the node at the specified key path
 
 #### `getApplicationStartTime`
 
-> getApplicationStartTime(args: [ODC.GetApplicationStartTimeArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%GetApplicationStartTimeArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {startTime: number, timeTaken: number}
+> getApplicationStartTime(args: [ODC.GetApplicationStartTimeArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetApplicationStartTimeArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {startTime: number, timeTaken: number}
 
 Gives access to Roku's [roAppManager.getUptime()](https://developer.roku.com/en-gb/docs/references/brightscript/interfaces/ifappmanager.md#getuptime-as-object) to allow a highly accurate time since application load that can be useful in performance tests.
 
-#### `getServerHost`
+#### `getClientHost`
 
-> getServerHost(args: [ODC.GetServerHostArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetServerHostArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {host: string, timeTaken: number}
+> getClientHost(args: [ODC.GetClientHostArgs](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20GetClientHostArgs), options: [ODC.RequestOptions](./client/src/types/OnDeviceComponent.ts#:~:text=export%20interface%20RequestOptions)): {host: string, timeTaken: number}
 
-Gets the server host that the device is communicating with.
+Gets the client host that the device is communicating with.
 
 ```ts
-const hostInfo = await odc.getServerHost();
+const hostInfo = await odc.getClientHost();
 console.log('Connected to:', hostInfo.host);
 ```
 

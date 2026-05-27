@@ -21,7 +21,7 @@ export enum RequestType {
 	getNodesInfo = 'getNodesInfo',
 	getNodesWithProperties = 'getNodesWithProperties',
 	getRootsCount = 'getRootsCount',
-	getServerHost = 'getServerHost',
+	getClientHost = 'getClientHost',
 	getValue = 'getValue',
 	getValues = 'getValues',
 	getVolumeList = 'getVolumeList',
@@ -47,7 +47,7 @@ export enum RequestType {
 	writeRegistry = 'writeRegistry',
 }
 
-export type RequestArgs = CallFuncArgs | CreateChildArgs | GetFocusedNodeArgs | GetValueArgs | GetValuesArgs | HasFocusArgs | IsInFocusChainArgs | OnFieldChangeArgs | CancelRequestArgs | SetValueArgs | ReadRegistryArgs | WriteRegistryArgs | DeleteRegistrySectionsArgs | DeleteEntireRegistrySectionsArgs | GetChildrenByElementIdArgs | GetNodesInfoArgs | CreateDirectoryArgs | DeleteEntireRegistrySectionsArgs | DeleteFileArgs | DisableScreensaverArgs | FocusNodeArgs | GetAllCountArgs | GetDirectoryListingArgs | GetNodesWithPropertiesArgs | GetRootsCountArgs | GetServerHostArgs | GetVolumeListArgs | IsShowingOnScreenArgs | IsSubtypeArgs | ReadFileArgs | RenameFileArgs | SetSettingsArgs | StartResponsivenessTestingArgs | StatPathArgs | WriteFileArgs | RemoveNodeArgs |RemoveNodeChildrenArgs | DisableScreensaverArgs;
+export type RequestArgs = CallFuncArgs | CreateChildArgs | GetFocusedNodeArgs | GetValueArgs | GetValuesArgs | HasFocusArgs | IsInFocusChainArgs | OnFieldChangeArgs | CancelRequestArgs | SetValueArgs | ReadRegistryArgs | WriteRegistryArgs | DeleteRegistrySectionsArgs | DeleteEntireRegistrySectionsArgs | GetChildrenByElementIdArgs | GetNodesInfoArgs | CreateDirectoryArgs | DeleteEntireRegistrySectionsArgs | DeleteFileArgs | DisableScreensaverArgs | FocusNodeArgs | GetAllCountArgs | GetDirectoryListingArgs | GetNodesWithPropertiesArgs | GetRootsCountArgs | GetClientHostArgs | GetVolumeListArgs | IsShowingOnScreenArgs | IsSubtypeArgs | ReadFileArgs | RenameFileArgs | SetSettingsArgs | StartResponsivenessTestingArgs | StatPathArgs | WriteFileArgs | RemoveNodeArgs |RemoveNodeChildrenArgs | DisableScreensaverArgs;
 
 export enum BaseType {
 	elementId = 'elementId',
@@ -126,6 +126,7 @@ export interface NodeRepresentation {
 	scaleRotateCenter?: [number, number];
 	subtype: string;
 	translation?: [number, number];
+	uiElementId?: string;
 	visible?: boolean;
 }
 
@@ -403,7 +404,7 @@ export interface DeleteEntireRegistrySectionsArgs {}
 
 export interface GetApplicationStartTimeArgs {}
 
-export interface GetServerHostArgs {}
+export interface GetClientHostArgs {}
 
 export interface SetSettingsArgs {
 	logLevel: LogLevels;

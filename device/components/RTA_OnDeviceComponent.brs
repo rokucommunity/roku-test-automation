@@ -728,21 +728,13 @@ end function
 
 function processGetNodesWithPropertiesRequest(request as Object) as Object
 	args = request.args
-	nodeRefKey = args.nodeRefKey
-	if NOT RTA_isString(nodeRefKey) then
-		return RTA_buildErrorResponseObject("Invalid value supplied for 'nodeRefKey' param")
-	end if
 
-	storedNodes = m.nodeReferences[nodeRefKey]
-	if NOT RTA_isArray(storedNodes) then
-		return RTA_buildErrorResponseObject("Invalid nodeRefKey supplied '" + nodeRefKey + "'. Make sure you have stored first")
-	end if
+	processAssignElementIdOnAllNodesRequest({ args: {} })
 
+	allNodes = m.top.getAll()
 	matchingNodes = []
-	matchingNodeRefs = []
 	properties = args.properties
-	for nodeRef = 0 to RTA_getLastIndex(storedNodes)
-		node = storedNodes[nodeRef]
+	for each node in allNodes
 		nodeMatches = true
 		for each property in properties
 			result = doesNodeHaveProperty(node, property)
@@ -757,13 +749,11 @@ function processGetNodesWithPropertiesRequest(request as Object) as Object
 		end for
 		if nodeMatches then
 			matchingNodes.push(node)
-			matchingNodeRefs.push(nodeRef)
 		end if
 	end for
 
 	return {
 		"nodes": matchingNodes
-		"nodeRefs": matchingNodeRefs
 	}
 end function
 
@@ -1147,6 +1137,7 @@ function recursivelyConvertValueToJsonCompatible(value as Object, maxChildDepth 
 		end if
 
 		value.subtype = node.subtype()
+		value.uiElementId = node.getUIElementId()
 	end if
 
 	return value

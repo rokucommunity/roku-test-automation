@@ -379,8 +379,6 @@ export class OnDeviceComponent {
 	 * Finds nodes in the scene graph that match specified property criteria
 	 */
 	public async getNodesWithProperties(args: ODC.GetNodesWithPropertiesArgs, options: ODC.RequestOptions = {}) {
-		this.applySharedKeyPathLogic(args, options);
-
 		// We allow short symbol operators but want to convert to a common format for simpler code on the Roku side
 		const operatorConversion: {
 			[key: string]: ODC.ComparisonOperators
@@ -430,7 +428,6 @@ export class OnDeviceComponent {
 		const result = await this.sendRequest(ODC.RequestType.getNodesWithProperties, args, options);
 		return result.json as {
 			nodes: ODC.NodeRepresentation[]
-			nodeRefs: number[]
 		} & ODC.ReturnTimeTaken;
 	}
 
@@ -634,11 +631,10 @@ export class OnDeviceComponent {
 	}
 
 	/**
-	 * Gets the server host that the device is communicating with
-	 * TODO rename in 3.0 as getClientHost
+	 * Gets the client host that the device is communicating with
 	 */
-	public async getServerHost(args: ODC.GetServerHostArgs = {}, options: ODC.RequestOptions = {}) {
-		const result = await this.sendRequest(ODC.RequestType.getServerHost, args, options);
+	public async getClientHost(args: ODC.GetClientHostArgs = {}, options: ODC.RequestOptions = {}) {
+		const result = await this.sendRequest(ODC.RequestType.getClientHost, args, options);
 		return result.json as {
 			host: string
 		};
