@@ -6,8 +6,7 @@ const config = {
     watchExtensions: ['ts'],
     require: [
         'ts-node/register',
-        'source-map-support/register',
-        './src/test/setup.ts'
+        'source-map-support/register'
     ]
 };
 if (nodeVersion >= 22) {
