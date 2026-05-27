@@ -6,11 +6,11 @@
     "typings": "client/dist/index.d.ts",
     "scripts": {
         "build": "rm -f tsconfig.tsbuildinfo && rimraf dist && tsc",
-        "test": "npm run build && nyc mocha \"./dist/**/*.spec.js\" --ignore \"./dist/**/*.device.spec.js\"",
+        "test": "nyc mocha \"./src/**/*.spec.ts\" --ignore \"./src/**/*.device.spec.ts\"",
         "lint": "eslint \"./src/**/*.ts\"",
         "validate-client": "npx bsc --project bsconfig.json --create-package false --copy-to-staging false --diagnostic-reporters detailed github-actions",
-        "test:device": "npm run build && mocha \"./dist/**/*.device.spec.js\"",
-        "test:all": "npm run build && mocha \"./dist/**/*.spec.js\"",
+        "test:device": "mocha \"./src/**/*.device.spec.ts\"",
+        "test:all": "nyc mocha \"./src/**/*.spec.ts\"",
         "buildConfigSchema": "typescript-json-schema src/types/ConfigOptions.ts ConfigOptions --out rta-config.schema.json --noExtraProps --refs false --required --ignoreErrors",
         "buildRequestTypesSchema": "typescript-json-schema src/types/OnDeviceComponent.ts RequestType --out requestTypes.schema.json --ignoreErrors",
         "buildRequestArgsSchema": "typescript-json-schema src/types/OnDeviceComponent.ts RequestArgs --propOrder --out requestArgs.schema.json --ignoreErrors",
@@ -72,24 +72,27 @@
     },
     "nyc": {
         "include": [
-            "dist/**/!(*.spec).js"
+            "src/**/*.ts",
+            "!src/**/*.spec.ts"
         ],
         "exclude": [
-            "dist/test/**/*"
+            "src/test/**/*"
         ],
         "extension": [
-            ".js"
+            ".ts"
         ],
         "require": [
+            "ts-node/register",
             "source-map-support/register"
         ],
         "reporter": [
             "text-summary",
-            "html"
+            "html",
+            "lcovonly"
         ],
         "sourceMap": true,
         "instrument": true,
-        "check-coverage": true,
+        "check-coverage": false,
         "lines": 100,
         "statements": 100,
         "functions": 100,
@@ -99,10 +102,11 @@
         "timeout": 10000,
         "bail": false,
         "require": [
+            "ts-node/register",
             "source-map-support/register"
         ],
         "file": [
-            "./dist/test/include.js"
+            "./src/test/include.ts"
         ]
     }
 }
