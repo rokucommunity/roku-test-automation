@@ -24,13 +24,12 @@ jobs:
       - run: npm run build
       - run: npm run lint
       - run: npm run validate-client
-      # disabled: tests have pre-existing failures when no rta-config.json is present
-      # - run: npm run test
-      # - name: Upload coverage to Coveralls
-      #   if: matrix.os == 'ubuntu-latest'
-      #   uses: coverallsapp/github-action@v2
-      #   env:
-      #     #hardcode the coveralls token...it's not overly important to protect, and github actions won't allow forks to work with coveralls otherwise
-      #     COVERALLS_REPO_TOKEN: "F6lSsESQszSbdnLURxBkCbj7gE5uZKTaz"
-      #   with:
-      #     path-to-lcov: ./client/coverage/lcov.info
+      - run: npm run test
+      - name: Upload coverage to Coveralls
+        if: matrix.os == 'ubuntu-latest'
+        uses: coverallsapp/github-action@v2
+        env:
+          #hardcode the coveralls token...it's not overly important to protect, and github actions won't allow forks to work with coveralls otherwise
+          COVERALLS_REPO_TOKEN: "F6lSsESQszSbdnLURxBkCbj7gE5uZKTaz"
+        with:
+          path-to-lcov: ./client/coverage/lcov.info

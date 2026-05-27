@@ -16,21 +16,15 @@ import type { AppUIResponse, AppUIResponseChild } from '.';
 
 describe('ECP', function () {
 	let ecp: ECP;
-	let device: any;
+	let device: testUtils.FakeRokuDevice;
 	let ecpResponse: any;
 	let ecpUtils: any;
 	let config: ConfigOptions;
 
 	beforeEach(() => {
-		device = {
-			sendEcpPost: () => {
-				return ecpResponse;
-			},
-			sendEcpGet: () => {
-				return ecpResponse;
-			},
-			setConfig: (config) => { }
-		};
+		device = new testUtils.FakeRokuDevice();
+		device.sendEcpPost = (() => ecpResponse) as any;
+		device.sendEcpGet = (() => ecpResponse) as any;
 
 		config = {
 			RokuDevice: {
