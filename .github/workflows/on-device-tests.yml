@@ -1,4 +1,4 @@
-name: build
+name: on-device-tests
 on:
   push:
     branches:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  ci:
+  on-device-tests:
     runs-on: [self-hosted, roku-latest, enabled]
     defaults:
       run:
