@@ -3,8 +3,8 @@
     "RokuDevice": {
         "devices": [
             {
-                "host": "192.168.10.193",
-                "password": "aaaa",
+                "host": null,
+                "password": null,
                 "properties": {
                     "name": "RTA 1"
                 }

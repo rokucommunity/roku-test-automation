@@ -1,8 +1,48 @@
 import * as fsExtra from 'fs-extra';
 import type * as needle from 'needle';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
 
 import { utils } from '../utils';
 import { RokuDevice } from '../RokuDevice';
+
+const repoRootDir = path.resolve(__dirname, '../../../');
+
+export function setupTestEnvironment() {
+	//load environment variables from a .env file at the root of the repo
+	const dotEnvPath = path.resolve(repoRootDir, '.env');
+	if (fsExtra.existsSync(dotEnvPath)) {
+		dotenv.config({
+			path: dotEnvPath,
+			override: true,
+			processEnv: process.env,
+			quiet: true
+		});
+	}
+
+	const configFilePath = path.resolve(repoRootDir, 'testProject/rta-config.json');
+	const config = utils['getConfigFromConfigFileCore'](configFilePath);
+	if (process.env.ROKU_HOST && process.env.ROKU_PASSWORD) {
+		if (config.RokuDevice?.devices) {
+			config.RokuDevice.devices.map(x => {
+				//override the host and password with environment variables so CI/CD unit tests actually work
+				x.host = process.env.ROKU_HOST as string;
+				x.password = process.env.ROKU_PASSWORD as string;
+				return x;
+			});
+		}
+	}
+	//if we don't have a host or password, fail here so our tests have better error messages
+	const devices = config.RokuDevice?.devices ?? [];
+	if (devices.length === 0 || devices.some(x => !x.host || !x.password)) {
+		throw new Error(
+			`Missing Roku device host and/or password. Set ROKU_HOST and ROKU_PASSWORD in "${path.join(repoRootDir, '.env')}" or update the host & password in "${configFilePath}".`
+		);
+	}
+	utils.setupEnvironmentFromConfig(config);
+
+	return config;
+}
 
 /**
  * A RokuDevice subclass for use in unit tests. Lets `instanceof RokuDevice`

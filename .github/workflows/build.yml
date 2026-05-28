@@ -24,7 +24,7 @@ jobs:
       - run: npm run build
       - run: npm run lint
       - run: npm run validate-client
-      - run: npm run test
+      - run: npm run test (not device tests)
       - name: Upload coverage to Coveralls
         if: matrix.os == 'ubuntu-latest'
         uses: coverallsapp/github-action@v2

@@ -10,7 +10,7 @@ const sinon = sinonImport.createSandbox();
 const expect = chai.expect;
 
 import { ECP } from './ECP';
-import * as testUtils from './test/utils';
+import * as testUtils from './test/testHelpers.spec';
 import type { ConfigOptions } from './types/ConfigOptions';
 import type { AppUIResponse, AppUIResponseChild } from '.';
 
