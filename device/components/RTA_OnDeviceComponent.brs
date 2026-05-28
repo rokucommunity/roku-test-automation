@@ -323,7 +323,7 @@ function processGetChildrenByElementIdRequest(request as Object) as Object
 		end for
 
 		children = []
-		if foundNode <> invalid AND NOT foundNode.isSubtype("ArrayGrid") then
+		if foundNode <> invalid then
 			for each child in foundNode.getChildren(-1, 0)
 				children.push({
 					"subtype": child.subtype()
