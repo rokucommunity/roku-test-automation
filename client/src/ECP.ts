@@ -601,8 +601,7 @@ export class ECP {
 		const consumed = new Set<AppUIResponseChild>();
 
 		for (const realChild of fullChildrenList) {
-			// Try matching by id first (stable across reboots)
-			let match = (realChild.id) ? appUIById.get(realChild.id) : undefined;
+			let match: AppUIResponseChild | undefined = undefined;
 
 			// Fall back to uiElementId matching for position correlation
 			if (!match && realChild.uiElementId) {

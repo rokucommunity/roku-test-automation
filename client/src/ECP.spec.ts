@@ -30,15 +30,6 @@ describe('ECP', function () {
 		sinon.stub(device, 'sendEcpGet').callsFake(() => {
 			return ecpResponse;
 		});
-		// device = {
-		// 	sendEcpPost: () => {
-		// 		return ecpResponse;
-		// 	},
-		// 	sendEcpGet: () => {
-		// 		return ecpResponse;
-		// 	},
-		// 	setConfig: (config) => { },
-		// };
 
 		config = {
 			RokuDevice: {
