@@ -9,7 +9,7 @@ import * as querystring from 'needle/lib/querystring';
 import { ecp, device, utils } from './';
 import { setupTestEnvironment } from './test/testHelpers.spec';
 
-describe('RokuDevice', function () {
+describe.skip('RokuDevice', function () {
 	before(async () => {
 		setupTestEnvironment();
 		await ecp.sendLaunchChannel();

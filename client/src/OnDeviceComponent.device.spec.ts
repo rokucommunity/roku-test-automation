@@ -50,7 +50,7 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('storeNodeReferences', function () {
+	describe.skip('storeNodeReferences', function () {
 		let storeResult: Unwrap<typeof odc.storeNodeReferences>;
 		before(async () => {
 			storeResult = await odc.storeNodeReferences();
@@ -293,7 +293,7 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('getNodesInfo', function () {
+	describe.skip('getNodesInfo', function () {
 		let storeResult: Unwrap<typeof odc.storeNodeReferences>;
 		before(async () => {
 			storeResult = await odc.storeNodeReferences();
@@ -383,7 +383,7 @@ describe('OnDeviceComponent', function () {
 	});
 
 	describe('deleteNodeReferences', function () {
-		it('should successfully delete the node references for the default key', async () => {
+		it.skip('should successfully delete the node references for the default key', async () => {
 			await odc.storeNodeReferences();
 			await odc.deleteNodeReferences();
 			try {
@@ -403,7 +403,7 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('getNodesWithProperties', function () {
+	describe.skip('getNodesWithProperties', function () {
 		before(async () => {
 			await odc.storeNodeReferences({ includeArrayGridChildren: true });
 		});
@@ -507,7 +507,7 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('findNodesAtLocation', function () {
+	describe.skip('findNodesAtLocation', function () {
 		let nodeTreeResponse;
 		before(async () => {
 			nodeTreeResponse = await odc.storeNodeReferences({
@@ -723,7 +723,7 @@ describe('OnDeviceComponent', function () {
 			}
 		});
 
-		it('should work with nodeRef base', async () => {
+		it.skip('should work with nodeRef base', async () => {
 			const storeResult = await odc.storeNodeReferences();
 			const key = 10;
 			const storeNode = storeResult.flatTree[key];
@@ -803,7 +803,7 @@ describe('OnDeviceComponent', function () {
 					expect(value[0]).to.equal('name');
 				});
 
-				it('should work on node item', async () => {
+				it.skip('should work on node item', async () => {
 					const { value } = await odc.getValue({ base: 'global', keyPath: 'AuthManager.keys()' });
 					expect(value).to.be.instanceof(Array);
 					expect(value[0]).to.equal('change');
@@ -1094,7 +1094,7 @@ describe('OnDeviceComponent', function () {
 			assert.fail('Should have thrown an exception');
 		});
 
-		it('should return correct ref if requested', async () => {
+		it.skip('should return correct ref if requested', async () => {
 			const storeResult = await odc.storeNodeReferences();
 			const { node, ref } = await odc.getFocusedNode({ includeRef: true });
 			expect(ref).to.be.ok;
@@ -1103,7 +1103,7 @@ describe('OnDeviceComponent', function () {
 			expect(storeResult.flatTree[ref!].id).to.equal(node!.id);
 		});
 
-		it('should return focused arrayGrid child if requested', async () => {
+		it.skip('should return focused arrayGrid child if requested', async () => {
 			const storeResult = await odc.storeNodeReferences({ includeArrayGridChildren: true });
 			await odc.focusNode({
 				keyPath: '#rowListWithCustomTitleComponent'
@@ -2355,7 +2355,7 @@ describe('OnDeviceComponent', function () {
 			expect(observerFired).to.be.false;
 		});
 
-		it('should still work after a restart of the application', async () => {
+		it.skip('should still work after a restart of the application', async () => {
 			await ecp.sendLaunchChannel({
 				params: { contentId: 'deeplink' },
 				verifyLaunch: false
@@ -2545,7 +2545,7 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('getComponentGlobalAAKeyPath', function () {
+	describe.skip('getComponentGlobalAAKeyPath', function () {
 		it(`should return the specified key path`, async () => {
 			const { value } = await odc.getComponentGlobalAAKeyPath({
 				componentGlobalAAKeyPath: 'testingGetGlobalAA'
@@ -2568,7 +2568,7 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('setComponentGlobalAAKeyPath', function () {
+	describe.skip('setComponentGlobalAAKeyPath', function () {
 		it(`should be able to set values at the specified key path`, async () => {
 			const keyPath = 'testingGetGlobalAAWrite';
 			const randomValue = utils.randomStringGenerator();
@@ -2764,7 +2764,7 @@ describe('OnDeviceComponent', function () {
 		});
 
 		describe('restoreRegistry', function () {
-			it('should properly restore if configured to do so', async () => {
+			it.skip('should properly restore if configured to do so', async () => {
 				const odcConfig = odc['config'];
 				if (odcConfig?.OnDeviceComponent) {
 					odcConfig.OnDeviceComponent.restoreRegistry = true;

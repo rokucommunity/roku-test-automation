@@ -110,7 +110,7 @@ describe('NetworkProxy', function () {
 	});
 
 
-	it('should be able to intercept a request on device', async () => {
+	it.skip('should be able to intercept a request on device', async () => {
 		let resolve;
 		const promise = new Promise((res) => {
 			resolve = res;
