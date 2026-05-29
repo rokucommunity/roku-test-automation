@@ -21,7 +21,7 @@ export enum RequestType {
 	getNodesInfo = 'getNodesInfo',
 	getNodesWithProperties = 'getNodesWithProperties',
 	getRootsCount = 'getRootsCount',
-	getServerHost = 'getServerHost',
+	getClientHost = 'getClientHost',
 	getValue = 'getValue',
 	getValues = 'getValues',
 	getVolumeList = 'getVolumeList',
@@ -47,24 +47,18 @@ export enum RequestType {
 	writeRegistry = 'writeRegistry',
 }
 
-export type RequestArgs = CallFuncArgs | CreateChildArgs | GetFocusedNodeArgs | GetValueArgs | GetValuesArgs | HasFocusArgs | IsInFocusChainArgs | OnFieldChangeArgs | CancelRequestArgs | SetValueArgs | ReadRegistryArgs | WriteRegistryArgs | DeleteRegistrySectionsArgs | DeleteEntireRegistrySectionsArgs | StoreNodeReferencesArgs | GetChildrenByElementIdArgs | GetNodesInfoArgs | FindNodesAtLocationArgs | CreateDirectoryArgs | DeleteEntireRegistrySectionsArgs | DeleteFileArgs | DeleteNodeReferencesArgs | DisableScreensaverArgs | FocusNodeArgs | GetAllCountArgs | GetDirectoryListingArgs | GetNodesWithPropertiesArgs | GetRootsCountArgs | GetServerHostArgs | GetVolumeListArgs | IsShowingOnScreenArgs | IsSubtypeArgs | ReadFileArgs | RenameFileArgs | SetSettingsArgs | StartResponsivenessTestingArgs | StatPathArgs | WriteFileArgs | RemoveNodeArgs |RemoveNodeChildrenArgs | DisableScreensaverArgs;
+export type RequestArgs = CallFuncArgs | CreateChildArgs | GetFocusedNodeArgs | GetValueArgs | GetValuesArgs | HasFocusArgs | IsInFocusChainArgs | OnFieldChangeArgs | CancelRequestArgs | SetValueArgs | ReadRegistryArgs | WriteRegistryArgs | DeleteRegistrySectionsArgs | DeleteEntireRegistrySectionsArgs | GetChildrenByElementIdArgs | GetNodesInfoArgs | CreateDirectoryArgs | DeleteEntireRegistrySectionsArgs | DeleteFileArgs | DisableScreensaverArgs | FocusNodeArgs | GetAllCountArgs | GetDirectoryListingArgs | GetNodesWithPropertiesArgs | GetRootsCountArgs | GetClientHostArgs | GetVolumeListArgs | IsShowingOnScreenArgs | IsSubtypeArgs | ReadFileArgs | RenameFileArgs | SetSettingsArgs | StartResponsivenessTestingArgs | StatPathArgs | WriteFileArgs | RemoveNodeArgs |RemoveNodeChildrenArgs | DisableScreensaverArgs;
 
 export enum BaseType {
 	elementId = 'elementId',
 	focusedNode = 'focusedNode',
 	global = 'global',
-	nodeRef = 'nodeRef',
 	scene = 'scene'
 }
 
 export declare type LogLevels = 'off' | 'error' | 'warn' | 'info' | 'debug' | 'verbose';
 
-interface NodeRefKey {
-	/** If base is 'nodeRef' this is the key that we used to store the node references on. If one isn't provided we use the automatically generated one */
-	nodeRefKey?: string;
-}
-
-export interface BaseArgs extends NodeRefKey {
+export interface BaseArgs {
 	/** Specifies what the entry point is for this key path. Defaults to 'global' if not specified */
 	base?: BaseType |  keyof typeof BaseType;
 }
@@ -132,6 +126,7 @@ export interface NodeRepresentation {
 	scaleRotateCenter?: [number, number];
 	subtype: string;
 	translation?: [number, number];
+	uiElementId?: string;
 	visible?: boolean;
 }
 
@@ -204,19 +199,10 @@ export interface SetComponentGlobalAAKeyPath extends BaseKeyPath {
 	componentGlobalAAKeyPathValue: any;
 }
 
-export interface GetFocusedNodeArgs extends MaxChildDepth, NodeRefKey {
-	/** returns `ref` field in response that can be matched up with storeNodeReferences response for determining where we are in the node tree */
-	includeRef?: boolean;
-
-	/** If you only need access to the `ref` or `keyPath` in the output then you can speed up the request by choosing not to include the node in the response. Defaults to true */
-	includeNode?: boolean;
-
-	/** If true, will try to return the actual ArrayGrid itemComponent that is currently focused */
-	returnFocusedArrayGridChild?: boolean;
-}
+export interface GetFocusedNodeArgs {}
 
 export interface GetValueArgs extends BaseKeyPath {
-	/** Allows supplying a keypath to a node and the field fpr that node separately to allow for better integration with an elements library */
+	/** Allows supplying a keypath to a node and the field for that node separately to allow for better integration with an elements library */
 	field?: string;
 }
 
@@ -238,38 +224,13 @@ export interface HasFocusArgs extends BaseKeyPath {}
 
 export interface IsInFocusChainArgs extends BaseKeyPath {}
 
-export interface StoreNodeReferencesArgs extends NodeRefKey {
-	/** We can get ArrayGrid(RowList,MarkupGrid,etc) children but this has an extra overhead so is disabled by default */
-	includeArrayGridChildren?: boolean;
-
-	/** We can get total and type based count info but again this has some overhead so is disabled by default */
-	includeNodeCountInfo?: boolean;
-
-	/** We can get the boundingRect info for each stored node. Again this has a performance penalty so is turned off by default */
-	includeBoundingRectInfo?: boolean;
-}
-
 export interface AssignElementIdOnAllNodesArgs {
 	/** True by default. If false will regenerate a new element id for all elements even if one was previously assigned */
 	maintainExistingElementId?: boolean;
 }
 
-export interface StoreNodeReferencesResponse extends ReturnTimeTaken {
-	flatTree: TreeNode[];
-	rootTree: TreeNode[];
-	totalNodes?: number;
-	nodeCountByType?: {[key: string]: number}
-	currentDesignResolution?: {
-		width: number;
-		height: number;
-		resolution: 'FHD' | 'HD';
-	}
-}
-
 export interface AssignElementIdOnAllNodesResponse extends ReturnTimeTaken {
 }
-
-export interface DeleteNodeReferencesArgs extends NodeRefKey {}
 
 export interface DisableScreensaverArgs {
 	/** Set to true to disable screensaver from starting, false to allow screensaver to start at the appropriate time */
@@ -363,22 +324,8 @@ interface NodeComparison {
 	value: ComparableValueTypes;
 }
 
-export interface GetNodesWithPropertiesArgs extends MaxChildDepth, NodeRefKey {
+export interface GetNodesWithPropertiesArgs extends MaxChildDepth {
 	properties: NodeComparison[];
-}
-
-export interface FindNodesAtLocationArgs extends StoreNodeReferencesArgs {
-	/** horizontal pixel position you wish to find nodes at. Defaults to a resolution of 1920 but can be changed with OnDeviceComponent.uiResolution **/
-	x: number;
-
-	/** vertical pixel position you wish to find nodes at. Defaults to a resolution of 1080 but can be changed with OnDeviceComponent.uiResolution */
-	y: number;
-
-	/** If doing a single `findNodesAtLocation` request, it's not a big deal to call storeNodeReferences on the Roku to get our rect info. If you wish to call repeatedly you can make it much faster by providing an existing response from `storeNodeReferences` */
-	nodeTreeResponse?: StoreNodeReferencesResponse;
-
-	/** Will always be true no matter what is passed in */
-	includeBoundingRectInfo?: true;
 }
 
 export interface IsShowingOnScreenArgs extends BaseKeyPath {}
@@ -457,7 +404,7 @@ export interface DeleteEntireRegistrySectionsArgs {}
 
 export interface GetApplicationStartTimeArgs {}
 
-export interface GetServerHostArgs {}
+export interface GetClientHostArgs {}
 
 export interface SetSettingsArgs {
 	logLevel: LogLevels;
@@ -466,4 +413,3 @@ export interface SetSettingsArgs {
 export interface CancelRequestArgs {
 	id: string;
 }
-

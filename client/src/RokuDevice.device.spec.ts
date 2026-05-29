@@ -6,9 +6,11 @@ const sinon = sinonImport.createSandbox();
 const expect = chai.expect;
 import * as querystring from 'needle/lib/querystring';
 import { ecp, device } from './';
+import { setupTestEnvironment } from './test/testHelpers.spec';
 
 describe('RokuDevice', function () {
 	before(async () => {
+		setupTestEnvironment();
 		await ecp.sendLaunchChannel();
 	});
 

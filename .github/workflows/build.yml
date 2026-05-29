@@ -1,0 +1,35 @@
+name: build
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/setup-node@master
+        with:
+          node-version: "18.20.4"
+          architecture: 'x64' # fix for macos-latest
+      - run: npm ci
+      - run: npm run build
+      - run: npm run lint
+      - run: npm run validate-client
+      - run: npm run test
+      - name: Upload coverage to Coveralls
+        if: matrix.os == 'ubuntu-latest'
+        uses: coverallsapp/github-action@v2
+        env:
+          #hardcode the coveralls token...it's not overly important to protect, and github actions won't allow forks to work with coveralls otherwise
+          COVERALLS_REPO_TOKEN: "F6lSsESQszSbdnLURxBkCbj7gE5uZKTaz"
+        with:
+          path-to-lcov: ./client/coverage/lcov.info

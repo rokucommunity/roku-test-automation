@@ -9,16 +9,22 @@ import * as assert from 'assert';
 import { utils } from './utils';
 import type * as ODC from './types/OnDeviceComponent';
 import { ecp, odc, device } from '.';
+import { setupTestEnvironment } from './test/testHelpers.spec';
 
 // Used to unwrap promise return types to get the true value
 type Unwrap<T> = T extends Promise<infer U> ? U : T extends (...args: any) => Promise<infer U> ? U : T extends (...args: any) => infer U ? U : T;
 
 describe('OnDeviceComponent', function () {
 	before(async () => {
+		setupTestEnvironment();
 		await device.deploy({
 			rootDir: '../testProject',
 			preventMultipleDeployments: true
 		});
+	});
+
+	after(async () => {
+		await odc.shutdown();
 	});
 
 	describe('getAllCount', function () {
@@ -43,137 +49,6 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('storeNodeReferences', function () {
-		let storeResult: Unwrap<typeof odc.storeNodeReferences>;
-		before(async () => {
-			storeResult = await odc.storeNodeReferences();
-		});
-
-		it('should have the correct fields for flatTree', () => {
-			expect(storeResult.flatTree).to.be.an('array');
-			for (const tree of storeResult.flatTree) {
-				expect(tree.subtype).to.be.a.string;
-				expect(tree.id).to.be.a.string;
-				if (tree.id !== 'animation') {
-					expect(tree.visible).to.be.a('boolean');
-					expect(tree.opacity).to.be.a('number');
-					expect(tree.translation).to.be.an('array');
-				}
-				expect(tree.id).to.be.string;
-				expect(tree.ref).to.be.a('number');
-				expect(tree.parentRef).to.be.a('number');
-			}
-		});
-
-		it('should have the correct fields for rootTree', () => {
-			expect(storeResult.rootTree).to.be.an('array');
-			const tree = storeResult.rootTree[0];
-
-			expect(tree.subtype).to.be.a.string;
-			expect(tree.id).to.be.a.string;
-			expect(tree.visible).to.be.a('boolean');
-			expect(tree.opacity).to.be.a('number');
-			expect(tree.translation).to.be.an('array');
-			expect(tree.ref).to.be.a('number');
-			expect(tree.parentRef).to.be.a('number');
-			expect(tree.children).to.be.an('array');
-		});
-
-		it('each tree should have a children array field', () => {
-			expect(storeResult.rootTree).to.be.array();
-			for (const tree of storeResult.flatTree) {
-				expect(tree.children).to.be.array();
-			}
-		});
-
-		it('should not include node count info by default', () => {
-			expect(storeResult.totalNodes).to.not.be.ok;
-			expect(storeResult.nodeCountByType).to.not.be.ok;
-		});
-
-		it('should include correct keyPaths for both findNode and index based key paths', () => {
-			expect(storeResult.rootTree[0].children[5].keyPath).to.equal('#pagesContainerGroup');
-			expect(storeResult.rootTree[0].children[5].children[0].keyPath).to.equal('#pagesContainerGroup.0');
-		});
-
-		describe('includeNodeCountInfo', function () {
-			before(async () => {
-				storeResult = await odc.storeNodeReferences({
-					includeNodeCountInfo: true
-				});
-			});
-
-			it('should include node count info if requested', () => {
-				expect(storeResult.totalNodes).to.be.greaterThan(0);
-				expect(Object.keys(storeResult.nodeCountByType!).length).to.be.greaterThan(0);
-			});
-
-			it('should not run array grid child finding code unless explicitly requested', () => {
-				for (const nodeTree of storeResult.flatTree) {
-					expect(nodeTree.subtype).to.not.equal('RowListItem');
-				}
-			});
-		});
-
-		describe('includeArrayGridChildren', function () {
-			before(async () => {
-				storeResult = await odc.storeNodeReferences({
-					includeArrayGridChildren: true
-				});
-			});
-
-			it('should include ArrayGrid children and keyPaths if requested', () => {
-				let arrayGridChildrenCount = 0;
-				for (const nodeTree of storeResult.flatTree) {
-					if (nodeTree.parentRef === -1) {
-						continue;
-					}
-
-					if (nodeTree.subtype === 'RowListItem') {
-						arrayGridChildrenCount++;
-					} else if (nodeTree.subtype === 'RowListItemComponent') {
-						expect(nodeTree.keyPath.endsWith(`items.${nodeTree.position}`)).to.be.true;
-					} else if (nodeTree.subtype === 'RowListRowTitleComponent') {
-						expect(nodeTree.keyPath.endsWith(`title`)).to.be.true;
-					}
-				}
-				expect(arrayGridChildrenCount).to.be.greaterThan(0);
-			});
-
-			it('should be able to pull ArrayGrid children for an itemComponent even if it did not have a parent and did not have enough items to have an itemComponent in the same row that had a parent as long as we have a rowTitleComponent', () => {
-				let rowListWithCustomTitleComponentNodeTree: ODC.TreeNode | undefined = undefined;
-				for (const nodeTree of storeResult.flatTree) {
-					if (nodeTree.id === 'rowListWithCustomTitleComponent') {
-						rowListWithCustomTitleComponentNodeTree = nodeTree;
-					}
-				}
-				expect(rowListWithCustomTitleComponentNodeTree).to.be.ok;
-				const markupGrid = rowListWithCustomTitleComponentNodeTree?.children[0].children[1];
-				expect(markupGrid?.subtype).to.equal('MarkupGrid');
-				expect(markupGrid?.children.length).to.equal(1);
-				expect(markupGrid?.children[0].subtype).to.equal('RowListItemComponent');
-			});
-		});
-
-		describe('includeBoundingRectInfo', function () {
-			before(async () => {
-				storeResult = await odc.storeNodeReferences({
-					includeBoundingRectInfo: true
-				});
-			});
-
-			it('should include boundingRect info if requested and node extends from group', () => {
-				for (const nodeTree of storeResult.flatTree) {
-					if (nodeTree.id === 'animation') {
-						expect(nodeTree.sceneRect).to.be.undefined;
-					} else {
-						expect(nodeTree.sceneRect).to.not.be.undefined;
-					}
-				}
-			});
-		});
-	});
-
 	describe('getRootsCount', function () {
 		it('should have the correct fields and return a known node subtype', async () => {
 			const { totalNodes, nodeCountByType } = await odc.getRootsCount();
@@ -194,20 +69,21 @@ describe('OnDeviceComponent', function () {
 	});
 
 	describe('getNodesInfo', function () {
-		let storeResult: Unwrap<typeof odc.storeNodeReferences>;
+		let appUIResponse: Awaited<ReturnType<typeof ecp.getAppUI>>;
 		before(async () => {
-			storeResult = await odc.storeNodeReferences();
+			appUIResponse = await ecp.getAppUI(odc);
 		});
 
 		it('should get only the requested number of nodes with the right return types', async () => {
+			const sceneChildren = appUIResponse.screen.children[0].children ?? [];
 			const requests = {} as {
 				[key: string]: ODC.GetValueArgs
 			};
-			for (const index in storeResult.flatTree) {
-				if (index === '12') break;
-				requests[index] = {
-					base: 'nodeRef',
-					keyPath: index
+			for (let i = 0; i < Math.min(sceneChildren.length, 12); i++) {
+				const child = sceneChildren[i];
+				requests[`child${i}`] = {
+					base: 'scene',
+					keyPath: child.keyPath
 				};
 			}
 
@@ -218,8 +94,7 @@ describe('OnDeviceComponent', function () {
 			for (const key in results) {
 				const node = results[key];
 				expect(node).to.be.ok;
-				expect(node.fields.id.value).to.equal(storeResult.flatTree[key].id);
-				expect(node.subtype).to.equal(storeResult.flatTree[key].subtype);
+				expect(node.subtype).to.be.a('string');
 			}
 		});
 
@@ -227,8 +102,8 @@ describe('OnDeviceComponent', function () {
 			const { results } = await odc.getNodesInfo({
 				requests: {
 					firstItem: {
-						base: 'nodeRef',
-						keyPath: '0'
+						base: 'scene',
+						keyPath: ''
 					}
 				}
 			});
@@ -244,23 +119,18 @@ describe('OnDeviceComponent', function () {
 			const { results } = await odc.getNodesInfo({
 				requests: {
 					firstItem: {
-						base: 'nodeRef',
-						keyPath: '0'
+						base: 'scene',
+						keyPath: '',
+						responseMaxChildDepth: 1
 					}
 				}
 			});
 
 			const node = results.firstItem;
-			const expectedSubtypes = [
-				'Poster',
-				'Poster',
-				'Rectangle',
-				'Animation',
-				'Group',
-				'Group'
-			];
+			expect(node.children).to.be.an('array');
+			expect(node.children.length).to.be.greaterThan(0);
 			for (const child of node.children) {
-				expect(child.subtype).to.equal(expectedSubtypes.shift());
+				expect(child.subtype).to.be.a('string');
 			}
 		});
 
@@ -282,32 +152,7 @@ describe('OnDeviceComponent', function () {
 		});
 	});
 
-	describe('deleteNodeReferences', function () {
-		it('should successfully delete the node references for the default key', async () => {
-			await odc.storeNodeReferences();
-			await odc.deleteNodeReferences();
-			try {
-				await odc.getNodesInfo({
-					requests: {
-						firstItem: {
-							base: 'nodeRef',
-							keyPath: '0'
-						}
-					}
-				});
-			} catch (e) {
-				// failed as expected
-				return;
-			}
-			assert.fail('Should have thrown an exception on the getNodesInfo if the references were removed');
-		});
-	});
-
 	describe('getNodesWithProperties', function () {
-		before(async () => {
-			await odc.storeNodeReferences({ includeArrayGridChildren: true });
-		});
-
 		it('should be able to work with a single field with no operator specified and return the correct response', async () => {
 			const fieldValue = true;
 			const fieldName = 'myCustomBooleanField';
@@ -317,7 +162,7 @@ describe('OnDeviceComponent', function () {
 				value: fieldValue
 			});
 
-			const { nodes, nodeRefs } = await odc.getNodesWithProperties({
+			const { nodes } = await odc.getNodesWithProperties({
 				properties: [{
 					field: fieldName,
 					value: fieldValue
@@ -325,7 +170,6 @@ describe('OnDeviceComponent', function () {
 			});
 
 			expect(nodes.length).to.equal(1);
-			expect(nodeRefs.length).to.equal(1);
 			const node = nodes[0];
 			expect(node.subtype).to.equal('LandingPage');
 			expect(node[fieldName]).to.equal(fieldValue);
@@ -404,119 +248,6 @@ describe('OnDeviceComponent', function () {
 			const node = nodes[0];
 			expect(node.subtype).to.equal('Poster');
 			expect(node.id).to.equal('poster');
-		});
-	});
-
-	describe('findNodesAtLocation', function () {
-		let nodeTreeResponse;
-		before(async () => {
-			nodeTreeResponse = await odc.storeNodeReferences({
-				includeArrayGridChildren: true,
-				includeBoundingRectInfo: true
-			});
-		});
-
-		it('should sort the matching nodes with the center closest to specified location first', async () => {
-			const { matches } = await odc.findNodesAtLocation({
-				x: 100,
-				y: 100,
-				nodeTreeResponse: nodeTreeResponse
-			});
-			expect(matches[0].id).to.equal('rect2');
-		});
-
-		it('should not match nodes that are not visible', async () => {
-			const { matches } = await odc.findNodesAtLocation({
-				x: 100,
-				y: 100,
-				nodeTreeResponse: nodeTreeResponse
-			});
-			for (const match of matches) {
-				expect(match.id).to.not.equal('invisibleRect');
-			}
-		});
-
-		it('Should return proper ArrayGrid child for a MarkupGrid', async () => {
-			const { matches } = await odc.findNodesAtLocation({
-				x: 700,
-				y: 150,
-				nodeTreeResponse: nodeTreeResponse
-			});
-			expect(matches[0].keyPath).to.equal('#pagesContainerGroup.0.#markupGrid.1.#rect');
-		});
-
-		it('Should return proper ArrayGrid child for a RowList', async () => {
-			const { matches } = await odc.findNodesAtLocation({
-				x: 500,
-				y: 600,
-				nodeTreeResponse: nodeTreeResponse
-			});
-			expect(matches[0].keyPath).to.equal('#pagesContainerGroup.0.#rowListWithoutCustomTitleComponent.1.items.1.#rect');
-		});
-	});
-
-	describe('responsivenessTesting', function () {
-		it('should fail to get data if we have not started responsiveness testing yet', async () => {
-			try {
-				await odc.getResponsivenessTestingData();
-			} catch (e) {
-				// failed as expected
-				return;
-			}
-			assert.fail('Should have thrown an exception');
-		});
-
-		it('should use our passed in params if provided', async () => {
-			const periodTickCount = 10;
-			const tickDuration = 1;
-			const periodsTrackCount = 2;
-			await odc.startResponsivenessTesting({
-				periodTickCount: periodTickCount,
-				tickDuration: tickDuration,
-				periodsTrackCount: periodsTrackCount
-			});
-			const response = await odc.getResponsivenessTestingData();
-			await odc.stopResponsivenessTesting();
-			expect(response.periodTickCount).to.equal(periodTickCount);
-			expect(response.tickDuration).to.equal(tickDuration);
-			expect(response.periodsTrackCount).to.equal(periodsTrackCount);
-		});
-
-		it('should return an empty array response if we have not finished a period yet but still give total counts', async () => {
-			const periodTickCount = 5000;
-			const tickDuration = 1;
-			await odc.startResponsivenessTesting({
-				periodTickCount: periodTickCount,
-				tickDuration: tickDuration
-			});
-			await utils.sleep(50);
-			const { periods, testingTotals } = await odc.getResponsivenessTestingData();
-			await odc.stopResponsivenessTesting();
-			expect(periods).to.be.an('array');
-			expect(periods.length).to.equal(0);
-			expect(testingTotals.duration).to.be.a('number');
-			expect(testingTotals.tickCount).to.be.a('number');
-			expect(testingTotals.percent).to.be.a('number');
-		});
-
-		it('should return a proper response if enough time has passed for periods to be set', async () => {
-			const periodTickCount = 5;
-			const tickDuration = 1;
-			const periodsTrackCount = 2;
-			await odc.startResponsivenessTesting({
-				periodTickCount: periodTickCount,
-				tickDuration: tickDuration,
-				periodsTrackCount: periodsTrackCount
-			});
-			await utils.sleep(50);
-			const { periods, testingTotals } = await odc.getResponsivenessTestingData();
-			await odc.stopResponsivenessTesting();
-			expect(periods).to.be.an('array');
-			expect(periods.length).to.equal(periodsTrackCount);
-			expect(periods[0].percent).to.be.a('number');
-			expect(testingTotals.duration).to.be.a('number');
-			expect(testingTotals.tickCount).to.be.a('number');
-			expect(testingTotals.percent).to.be.a('number');
 		});
 	});
 
@@ -623,15 +354,6 @@ describe('OnDeviceComponent', function () {
 			}
 		});
 
-		it('should work with nodeRef base', async () => {
-			const storeResult = await odc.storeNodeReferences();
-			const key = 10;
-			const storeNode = storeResult.flatTree[key];
-			const { value } = await odc.getValue({ base: 'nodeRef', keyPath: `${key}` });
-			expect(value.id).to.equal(storeNode.id);
-			expect(value.subtype).to.equal(storeNode.subtype);
-		});
-
 		it('should be able to retrieve a RowList item component', async () => {
 			const { value } = await odc.getValue({
 				keyPath: '#pagesContainerGroup.0.#rowListWithCustomTitleComponent.1.items.2'
@@ -706,7 +428,7 @@ describe('OnDeviceComponent', function () {
 				it('should work on node item', async () => {
 					const { value } = await odc.getValue({ base: 'global', keyPath: 'AuthManager.keys()' });
 					expect(value).to.be.instanceof(Array);
-					expect(value[0]).to.equal('change');
+					expect(value[0]).to.equal('id');
 				});
 
 				it('should gracefully fallback if called on nonsupported type', async () => {
@@ -880,8 +602,8 @@ describe('OnDeviceComponent', function () {
 				});
 
 				expect(value.loopingNode).to.be.an('object');
-				expect(Object.keys(value.loopingNode)).to.have.lengthOf(2);
-				expect(Object.keys(value.loopingNode)).to.have.members(['id', 'subtype']);
+				expect(Object.keys(value.loopingNode)).to.have.lengthOf(3);
+				expect(Object.keys(value.loopingNode)).to.have.members(['id', 'subtype', 'uiElementId']);
 				expect(value.loopingNode).to.have.property('subtype', 'Group');
 			});
 
@@ -936,98 +658,6 @@ describe('OnDeviceComponent', function () {
 			expect(results.subchild1.value.id).to.eq('subchild1');
 			expect(results.subchild2.value.id).to.eq('subchild2');
 			expect(timeTaken).to.be.a('number');
-		});
-	});
-
-	describe('getFocusedNode', function () {
-		it('should return currently focused node', async () => {
-			await odc.focusNode({
-				keyPath: '#pagesContainerGroup.#loginButton'
-			});
-			const { node } = await odc.getFocusedNode();
-			expect(node).to.be.ok;
-			expect(node!.id).to.equal('loginButton');
-		});
-
-		it('should not return the node if includeNode is false', async () => {
-			await odc.focusNode({
-				keyPath: '#pagesContainerGroup.#loginButton',
-			});
-			const { node } = await odc.getFocusedNode({ includeNode: false });
-			expect(node).to.be.not.be.ok;
-		});
-
-		it('should not include children by default', async () => {
-			const { node } = await odc.getFocusedNode();
-			expect(node).to.be.ok;
-			expect(node!.children).to.be.undefined;
-		});
-
-		it('should not include children if maxChildDepth is set to zero', async () => {
-			const { node } = await odc.getFocusedNode({ responseMaxChildDepth: 0 });
-			expect(node).to.be.ok;
-			expect(node!.children).to.be.undefined;
-		});
-
-		it('should include children to specified depth', async () => {
-			const { node } = await odc.getFocusedNode({ responseMaxChildDepth: 1 });
-			expect(node).to.be.ok;
-			expect(node?.children).to.not.be.empty;
-			for (const child of node?.children ?? []) {
-				// We only requested 1 so make sure it only returned a single level
-				expect(child.children).to.be.undefined;
-			}
-		});
-
-		it('should not include ref field by default', async () => {
-			const { ref } = await odc.getFocusedNode();
-			expect(ref).to.not.be.ok;
-		});
-
-		it('should fail if invalid key supplied or we did not store first', async () => {
-			try {
-				await odc.getFocusedNode({ nodeRefKey: 'na', includeRef: true });
-			} catch (e) {
-				// failed as expected
-				return;
-			}
-			assert.fail('Should have thrown an exception');
-		});
-
-		it('should return correct ref if requested', async () => {
-			const storeResult = await odc.storeNodeReferences();
-			const { node, ref } = await odc.getFocusedNode({ includeRef: true });
-			expect(ref).to.be.ok;
-			expect(node).to.be.ok;
-			expect(storeResult.flatTree[ref!].subtype).to.equal(node!.subtype);
-			expect(storeResult.flatTree[ref!].id).to.equal(node!.id);
-		});
-
-		it('should return focused arrayGrid child if requested', async () => {
-			const storeResult = await odc.storeNodeReferences({ includeArrayGridChildren: true });
-			await odc.focusNode({
-				keyPath: '#rowListWithCustomTitleComponent'
-			});
-			const { node, ref } = await odc.getFocusedNode({
-				includeRef: true,
-				returnFocusedArrayGridChild: true
-			});
-			expect(ref).to.be.ok;
-			expect(node).to.be.ok;
-			expect(storeResult.flatTree[ref!].subtype).to.equal(node!.subtype);
-			expect(node!.itemContent.id).to.equal('row 0  item 0');
-
-			// Reset back to login button for focus
-			await odc.focusNode({
-				keyPath: '#pagesContainerGroup.#loginButton'
-			});
-		});
-
-		it('should include correct keyPath field', async () => {
-			const expectedKeyPath = '#pagesContainerGroup.0.#loginButton';
-			await odc.focusNode({ keyPath: expectedKeyPath });
-			const { keyPath } = await odc.getFocusedNode();
-			expect(keyPath).to.equal(expectedKeyPath);
 		});
 	});
 

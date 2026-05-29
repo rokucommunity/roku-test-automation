@@ -14,8 +14,6 @@ export interface ConfigOptions {
 	OnDeviceComponent?: OnDeviceComponentConfigOptions;
 
 	NetworkProxy?: NetworkProxyOptions;
-
-	Suitest?: SuitestOptions;
 }
 
 export interface RokuDeviceConfigOptions {
@@ -105,21 +103,4 @@ export interface NetworkProxyOptions {
 
 	/** Useful for visually debugging issues. Use in the format like (http://127.0.0.1:8888). DOES NOT WORK WITH RELATIVE REDIRECTS IN CHARLES!!! */
 	forwardProxy?: string;
-}
-
-export interface SuitestOptions {
-	/** Path to your application */
-	applicationPath?: string;
-
-	/** TokenId for API access as supplied by Suitest */
-	tokenId?: string;
-
-	/** Token password for API access as supplied by Suitest */
-	tokenPassword?: string;
-
-	/** AppId of the application we're retrieving tests from from Suitest */
-	appId?: string;
-
-	/** The version of the application we're retrieving for */
-	version?: string;
 }

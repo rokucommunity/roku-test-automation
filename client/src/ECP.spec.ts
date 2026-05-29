@@ -11,7 +11,7 @@ const expect = chai.expect;
 
 import { RokuDevice } from './RokuDevice';
 import { ECP } from './ECP';
-import * as testUtils from './test/utils';
+import * as testUtils from './test/testHelpers.spec';
 import type { ConfigOptions } from './types/ConfigOptions';
 import type { AppUIResponse, AppUIResponseChild } from '.';
 
@@ -21,13 +21,15 @@ describe('ECP', function () {
 	let ecpResponse: any;
 	let ecpUtils: any;
 	let config: ConfigOptions;
+	let sendEcpPostStub: sinon.SinonStub;
+	let sendEcpGetStub: sinon.SinonStub;
 
 	beforeEach(() => {
 		device = new RokuDevice();
-		sinon.stub(device, 'sendEcpPost').callsFake(() => {
+		sendEcpPostStub = sinon.stub(device, 'sendEcpPost').callsFake(() => {
 			return ecpResponse;
 		});
-		sinon.stub(device, 'sendEcpGet').callsFake(() => {
+		sendEcpGetStub = sinon.stub(device, 'sendEcpGet').callsFake(() => {
 			return ecpResponse;
 		});
 
@@ -48,11 +50,11 @@ describe('ECP', function () {
 
 	describe('sendText', function () {
 		it('calls_device_sendEcpPost_for_each_character', async () => {
-			const stub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
 
 			const text = 'love my life';
 			await ecp.sendText(text);
-			expect(stub.callCount).to.equal(text.length);
+			expect(sendEcpPostStub.callCount).to.equal(text.length);
 		});
 
 		it('uses_raspTemplateVariable_if_provided_instead_of_text_for_rasp_output', async () => {
@@ -67,11 +69,11 @@ describe('ECP', function () {
 
 	describe('sendKeypressSequence', function () {
 		it('calls_device_sendEcpPost_for_each_key', async () => {
-			const stub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
 
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 			await ecp.sendKeypressSequence(keys);
-			expect(stub.callCount).to.equal(keys.length);
+			expect(sendEcpPostStub.callCount).to.equal(keys.length);
 		});
 
 		it('should send_the_pattern_multiple_times_in_the_correct_order_if_count_is_more_than_one', async () => {
@@ -79,7 +81,7 @@ describe('ECP', function () {
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 			const count = 3;
 
-			const stub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
 				expect(path).to.contain(keys[index]);
 				index++;
 				if (index === keys.length) {
@@ -88,28 +90,28 @@ describe('ECP', function () {
 			}) as any);
 
 			await ecp.sendKeypressSequence(keys, { count: count });
-			expect(stub.callCount).to.equal(keys.length * count);
+			expect(sendEcpPostStub.callCount).to.equal(keys.length * count);
 		});
 
 		it('should_not_send_any_keys_if_count_is_zero', async () => {
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 
-			const stub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
 
 			await ecp.sendKeypressSequence(keys, { count: 0 });
-			expect(stub.callCount).to.equal(0);
+			expect(sendEcpPostStub.callCount).to.equal(0);
 		});
 	});
 
 	describe('sendKeypress', function () {
 		it('calls_device_sendEcpPost', async () => {
-			const stub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
 				expect(path).to.contain(ECP.Key.Home);
 			}) as any);
 
 			await ecp.sendKeypress(ECP.Key.Home, 0);
 
-			if (stub.notCalled) {
+			if (sendEcpPostStub.notCalled) {
 				assert.fail('device.sendEcpPost not called');
 			}
 		});
@@ -178,46 +180,46 @@ describe('ECP', function () {
 
 	describe('sendKeyDown', function () {
 		it('sends_key_down_event', async () => {
-			const postStub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
 			await ecp.sendKeyDown(ECP.Key.Play);
 
-			expect(postStub.callCount).equals(1);
-			expect(postStub.getCall(0).lastArg).to.include('keydown/Play');
+			expect(sendEcpPostStub.callCount).equals(1);
+			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keydown/Play');
 		});
 
 		it('sends_multiple_key_events', async () => {
-			const postStub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
 			await ecp.sendKeyDown(ECP.Key.Play, 0, { count: 3 });
 
-			expect(postStub.callCount).equals(3);
-			expect(postStub.getCall(0).lastArg).to.include('keydown/Play');
-			expect(postStub.getCall(1).lastArg).to.include('keydown/Play');
-			expect(postStub.getCall(2).lastArg).to.include('keydown/Play');
+			expect(sendEcpPostStub.callCount).equals(3);
+			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keydown/Play');
+			expect(sendEcpPostStub.getCall(1).lastArg).to.include('keydown/Play');
+			expect(sendEcpPostStub.getCall(2).lastArg).to.include('keydown/Play');
 		});
 	});
 
 	describe('sendKeyUp', function () {
 		it('sends_key_up_event', async () => {
-			const postStub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
 			await ecp.sendKeyUp(ECP.Key.Play);
 
-			expect(postStub.callCount).equals(1);
-			expect(postStub.getCall(0).lastArg).to.include('keyup/Play');
+			expect(sendEcpPostStub.callCount).equals(1);
+			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keyup/Play');
 		});
 	});
 
 	describe('sendKeyPressAndHold', function () {
 		it('sends_long_key_press', async () => {
-			const postStub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
@@ -227,24 +229,24 @@ describe('ECP', function () {
 
 			await ecp.sendKeyPressAndHold(ECP.Key.Play, 500);
 
-			expect(postStub.callCount).equals(2);
-			expect(postStub.getCall(0).lastArg).to.include('keydown/Play');
-			expect(postStub.getCall(1).lastArg).to.include('keyup/Play');
+			expect(sendEcpPostStub.callCount).equals(2);
+			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keydown/Play');
+			expect(sendEcpPostStub.getCall(1).lastArg).to.include('keyup/Play');
 		});
 	});
 
 	describe('sendKeyEvent', function () {
 		it('sends_regular_key_press_when_press_and_hold_has_no_duration', async () => {
-			const postStub = sinon.stub(device, 'sendEcpPost').callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
 			await ecp.sendKeyEvent(ECP.Key.Play, 0);
 			await ecp.sendKeyEvent(ECP.Key.Play, { keydown: true, keyup: true, duration: 0 });
 
-			expect(postStub.callCount).equals(2);
-			expect(postStub.getCall(0).lastArg).to.include('keypress/Play');
-			expect(postStub.getCall(1).lastArg).to.include('keypress/Play');
+			expect(sendEcpPostStub.callCount).equals(2);
+			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keypress/Play');
+			expect(sendEcpPostStub.getCall(1).lastArg).to.include('keypress/Play');
 		});
 	});
 

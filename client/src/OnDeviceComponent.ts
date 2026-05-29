@@ -17,7 +17,6 @@ export class OnDeviceComponent {
 	private receivingRequestResponse?: ODC.RequestResponse;
 	private clientSocket?: net.Socket;
 	private clientSocketPromise?: Promise<net.Socket>;
-	private defaultNodeReferencesKey = utils.randomStringGenerator();
 
 	constructor(device: RokuDevice, config?: ConfigOptions) {
 		if (config) {
@@ -194,17 +193,13 @@ export class OnDeviceComponent {
 	}
 
 	/**
-	 * Gets the currently focused node in the scene graph
+	 * Convenience Method to get the currently focused node in the scene graph
 	 */
 	public async getFocusedNode(args: ODC.GetFocusedNodeArgs = {}, options: ODC.RequestOptions = {}) {
-		this.applySharedKeyPathLogic(args, options);
-
-		const result = await this.sendRequest(ODC.RequestType.getFocusedNode, args, options);
-		return result.json as {
-			node?: ODC.NodeRepresentation;
-			ref?: number;
-			keyPath?: string;
-		};
+		const result = await this.getValue({
+			base: 'focusedNode'
+		}, options);
+		return result;
 	}
 
 	/**
@@ -346,13 +341,6 @@ export class OnDeviceComponent {
 		if (!args.base) {
 			args.base = (this.getConfig()?.defaultBase) ?? ODC.BaseType.scene;
 		}
-
-		// Add nodeRefKey if needed
-		if (!args.nodeRefKey) {
-			if (!args.base || args.base === 'nodeRef') {
-				args.nodeRefKey = this.defaultNodeReferencesKey;
-			}
-		}
 	}
 
 	/**
@@ -377,82 +365,6 @@ export class OnDeviceComponent {
 		} & ODC.ReturnTimeTaken;
 	}
 
-	public async storeNodeReferences(args: ODC.StoreNodeReferencesArgs = {}, options: ODC.RequestOptions = {}) {
-		this.applySharedKeyPathLogic(args, options);
-		const result = await this.sendRequest(ODC.RequestType.storeNodeReferences, { ...args, convertResponseToJsonCompatible: false }, options);
-		const output = result.json as ODC.StoreNodeReferencesResponse;
-
-		const rootTree = [] as ODC.TreeNode[];
-		for (const tree of output.flatTree) {
-			if (!tree.children) {
-				tree.children = [];
-			}
-
-			if (tree.parentRef === -1) {
-				rootTree.push(tree);
-				continue;
-			}
-
-			const parentTree = output.flatTree[tree.parentRef];
-			if (!parentTree.children) {
-				parentTree.children = [];
-			}
-
-			parentTree.children.push(tree);
-		}
-		output.rootTree = rootTree;
-
-		this.buildKeyPathsRecursively(rootTree);
-
-		// sort children by position to make output more logical and add our keyPath on
-		for (const tree of output.flatTree) {
-			tree.children.sort((a, b) => a.position - b.position);
-		}
-
-		const designResolution = output.currentDesignResolution;
-		if (designResolution) {
-			let width = 1920;
-			let height = 1080;
-			if (this.getConfig()?.uiResolution === 'hd') {
-				width = 1280;
-				height = 720;
-			}
-			// We convert all the rects to the user's specified resolution so we don't have to mess with it in the future
-			const xMultiplier = width / designResolution.width;
-			const yMultiplier = height / designResolution.height;
-			const flatTree = output.flatTree;
-			for (const nodeTree of flatTree) {
-				if (!nodeTree.sceneRect && nodeTree.rect) {
-					// If we don't have a sceneRect then calculate it based off our parent sceneRect and our rect. Currently only used for ArrayGrid item component children
-					const parentSceneRect = flatTree[nodeTree.parentRef]?.sceneRect;
-					if (parentSceneRect) {
-						const rect = nodeTree.rect;
-						nodeTree.sceneRect = {
-							width: rect.width,
-							height: rect.height,
-							x: parentSceneRect.x + rect.x,
-							y: parentSceneRect.y + rect.y
-						};
-					}
-				}
-
-				const sceneRect = nodeTree.sceneRect;
-				if (!sceneRect) {
-					continue;
-				}
-
-				// For debugging if needed
-				// nodeTree['originalSceneRect'] = {...sceneRect};
-
-				sceneRect.x *= xMultiplier;
-				sceneRect.y *= yMultiplier;
-				sceneRect.width *= xMultiplier;
-				sceneRect.height *= yMultiplier;
-			}
-		}
-		return output;
-	}
-
 	/**
 	 * Assigns a unique element ID to all nodes in the scene graph for reference purposes
 	 */
@@ -463,62 +375,10 @@ export class OnDeviceComponent {
 		return output;
 	}
 
-	private buildKeyPathsRecursively(nodeTrees: ODC.TreeNode[], keyPathParts = [] as string[], parentIsRowlistItem = false, parentIsTitleGroup = false) {
-		for (const nodeTree of nodeTrees) {
-			let keyPathPostfix = '';
-			const currentNodeTreeKeyPathParts = [...keyPathParts];
-			let isRowlistItem = false;
-			let isTitleGroup = false;
-			if (nodeTree.subtype === 'RowListItem') {
-				currentNodeTreeKeyPathParts.push(nodeTree.position.toString());
-				isRowlistItem = true;
-
-				// We are supplying a keyPath for the Roku ArrayGrid internal components although they likely aren't needed
-				keyPathPostfix = '.items.0.getParent().getParent()';
-			} else if (parentIsRowlistItem) {
-				if (nodeTree.subtype === 'MarkupGrid') {
-					currentNodeTreeKeyPathParts.push('items');
-					// We are supplying a keyPath for the Roku ArrayGrid internal components although they likely aren't needed
-					keyPathPostfix = '.0.getParent()';
-				} else if (nodeTree.subtype === 'Group') {
-					currentNodeTreeKeyPathParts.push('title');
-					isTitleGroup = true;
-
-					// We are supplying a keyPath for the Roku ArrayGrid internal components although they likely aren't needed
-					keyPathPostfix = '.getParent()';
-				} else if (nodeTree.subtype === 'Label') {
-					// This is a Roku generated label. We do our best effort to get a keyPath that will work with it
-					currentNodeTreeKeyPathParts.push(`items.0.getParent().getParent().${nodeTree.position}`);
-				} else {
-					console.log('Encountered unexpected subtype ' + nodeTree.subtype);
-				}
-			} else if (parentIsTitleGroup) {
-				// We don't want to append to currentNodeTreeKeyPathParts in this case
-			} else if (nodeTree.id) {
-				currentNodeTreeKeyPathParts.push('#' + nodeTree.id);
-			} else if (nodeTree.position >= 0) {
-				currentNodeTreeKeyPathParts.push(nodeTree.position.toString());
-			}
-
-			nodeTree.keyPath = currentNodeTreeKeyPathParts.join('.') + keyPathPostfix;
-
-			this.buildKeyPathsRecursively(nodeTree.children, currentNodeTreeKeyPathParts, isRowlistItem, isTitleGroup);
-		}
-	}
-
-	public async deleteNodeReferences(args: ODC.DeleteNodeReferencesArgs = {}, options: ODC.RequestOptions = {}) {
-		this.applySharedKeyPathLogic(args, options);
-
-		const result = await this.sendRequest(ODC.RequestType.deleteNodeReferences, { ...args, convertResponseToJsonCompatible: false }, options);
-		return result.json as ODC.ReturnTimeTaken;
-	}
-
 	/**
 	 * Finds nodes in the scene graph that match specified property criteria
 	 */
 	public async getNodesWithProperties(args: ODC.GetNodesWithPropertiesArgs, options: ODC.RequestOptions = {}) {
-		this.applySharedKeyPathLogic(args, options);
-
 		// We allow short symbol operators but want to convert to a common format for simpler code on the Roku side
 		const operatorConversion: {
 			[key: string]: ODC.ComparisonOperators
@@ -568,130 +428,7 @@ export class OnDeviceComponent {
 		const result = await this.sendRequest(ODC.RequestType.getNodesWithProperties, args, options);
 		return result.json as {
 			nodes: ODC.NodeRepresentation[]
-			nodeRefs: number[]
 		} & ODC.ReturnTimeTaken;
-	}
-
-	private calculateRectCenterPoint(rect: ODC.BoundingRect) {
-		return {
-			x: (rect.x - rect.width) / 2,
-			y: (rect.y - rect.height) / 2
-		};
-	}
-
-	private calculateRectCenterPointOffsetFromLocation(x: number, y: number, rect: ODC.BoundingRect) {
-		const centerPoint = this.calculateRectCenterPoint(rect);
-		return {
-			x: x - centerPoint.x,
-			y: y - centerPoint.y
-		};
-	}
-
-	/**
-	 * Finds all visible nodes at a specific x,y screen coordinate, sorted by proximity to the point
-	 */
-	public async findNodesAtLocation(args: ODC.FindNodesAtLocationArgs, options: ODC.RequestOptions = {}) {
-		let nodeTreeResponse = args.nodeTreeResponse;
-		if (!nodeTreeResponse) {
-			args.includeBoundingRectInfo = true;
-			nodeTreeResponse = await this.storeNodeReferences(args, options);
-		}
-
-		const matches = [] as ODC.TreeNode[];
-		this.findNodesAtLocationCore(args.x, args.y, nodeTreeResponse.rootTree, matches);
-
-		// We now want to sort our matches to try and return the best one first
-		matches.sort((a, b) => {
-			const aOffest = this.calculateRectCenterPointOffsetFromLocation(args.x, args.y, a.sceneRect as ODC.BoundingRect);
-			const bOffset = this.calculateRectCenterPointOffsetFromLocation(args.x, args.y, b.sceneRect as ODC.BoundingRect);
-			return (Math.abs(aOffest.x) + Math.abs(aOffest.y)) - (Math.abs(bOffset.x) + Math.abs(bOffset.y));
-		});
-
-		return {
-			matches
-		};
-	}
-
-	private findNodesAtLocationCore(x: number, y: number, nodeTrees: ODC.TreeNode[], matches: ODC.TreeNode[]) {
-		let nodeFound = false;
-		for (const nodeTree of nodeTrees) {
-			// If we hit a sequestered item dig into its children immediately
-			if (nodeTree['sequestered']) {
-				nodeFound = this.findNodesAtLocationCore(x, y, nodeTree.children, matches);
-			}
-
-			const rect = nodeTree.sceneRect;
-			if (!rect) {
-				continue;
-			}
-
-			const isLocationWithinNodeDimensions = (x >= rect.x && x <= rect.x + rect.width && y >= rect.y && y <= rect.y + rect.height);
-			const isVisible = (nodeTree.visible && !!nodeTree.opacity);
-
-			if (isLocationWithinNodeDimensions && isVisible) {
-				if (!nodeTree.children.length) {
-					matches.push(nodeTree);
-					nodeFound = true;
-				} else {
-					nodeFound = this.findNodesAtLocationCore(x, y, nodeTree.children, matches);
-				}
-
-				// If we didn't find any children that were both visible and have x and y within the nodes dimensions then we add the current node to the list of matches. May eventually want to exclude some types like Group or LayoutGroup
-				if (!nodeFound) {
-					matches.push(nodeTree);
-					nodeFound = true;
-				}
-			}
-		}
-		return nodeFound;
-	}
-
-	/**
-	 * @deprecated will be removed in 3.0
-	 */
-	public async startResponsivenessTesting(args: ODC.StartResponsivenessTestingArgs = {}, options: ODC.RequestOptions = {}) {
-		const result = await this.sendRequest(ODC.RequestType.startResponsivenessTesting, args, options);
-		return result.json as ODC.ReturnTimeTaken;
-	}
-
-	/**
-	 * @deprecated will be removed in 3.0
-	 */
-	public async getResponsivenessTestingData(args = {}, options: ODC.RequestOptions = {}) {
-		const result = await this.sendRequest(ODC.RequestType.getResponsivenessTestingData, args, options);
-		return result.json as ODC.ReturnTimeTaken & {
-			periods: {
-				/** Duration of this period in milliseconds */
-				duration: number;
-
-				/** What percent of the time during the period the render thread was responsive. Value is from 0-100 */
-				percent: number;
-
-				/** How many ticks there were in this period */
-				tickCount: number;
-			}[];
-			periodsTrackCount: number;
-			periodTickCount: number;
-			testingTotals: {
-				/** Total duration since testing started in milliseconds */
-				duration: number;
-
-				/** What percent of the time since testing started the render thread was responsive. Value is from 0-100 */
-				percent: number;
-
-				/** Total number of ticks since testing started */
-				tickCount: number;
-			}
-			tickDuration: number;
-		};
-	}
-
-	/**
-	 * @deprecated will be removed in 3.0
-	 */
-	public async stopResponsivenessTesting(args = {}, options: ODC.RequestOptions = {}) {
-		const result = await this.sendRequest(ODC.RequestType.stopResponsivenessTesting, args, options);
-		return result.json as ODC.ReturnTimeTaken;
 	}
 
 	/**
@@ -894,11 +631,10 @@ export class OnDeviceComponent {
 	}
 
 	/**
-	 * Gets the server host that the device is communicating with
-	 * TODO rename in 3.0 as getClientHost
+	 * Gets the client host that the device is communicating with
 	 */
-	public async getServerHost(args: ODC.GetServerHostArgs = {}, options: ODC.RequestOptions = {}) {
-		const result = await this.sendRequest(ODC.RequestType.getServerHost, args, options);
+	public async getClientHost(args: ODC.GetClientHostArgs = {}, options: ODC.RequestOptions = {}) {
+		const result = await this.sendRequest(ODC.RequestType.getClientHost, args, options);
 		return result.json as {
 			host: string
 		};

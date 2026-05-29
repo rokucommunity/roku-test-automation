@@ -47,7 +47,7 @@ export class NetworkProxy {
 
 	/** Starts the proxy server and sets the registry on the Roku to start sending requests to the proxy server */
 	public async start(proxyPort?: number) {
-		const {host} = await this.odc.getServerHost();
+		const {host} = await this.odc.getClientHost();
 		const config = this.getConfig();
 
 		if(!proxyPort) {
