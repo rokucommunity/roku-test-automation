@@ -1,5 +1,6 @@
 {
     "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/client/rta-config.schema.json",
+    "extends": "../client/base-rta-config.json",
     "RokuDevice": {
         "devices": [
             {
