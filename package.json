@@ -6,7 +6,7 @@
     "typings": "dist/index.d.ts",
     "scripts": {
         "preversion": "npm run build && npm run lint && npm run test && npm run validate-client",
-        "build": "npm run clean && tsc",
+        "build": "npm run clean && tsc && npm run buildSchemas",
         "clean": "node -e \"require('fs').rmSync('dist', {recursive: true, force: true})\"",
         "lint": "eslint \"./src/**/*.ts\"",
         "test": "nyc mocha \"./src/**/*.spec.ts\" --ignore \"./src/**/*.device.spec.ts\"",
@@ -16,11 +16,9 @@
         "buildConfigSchema": "typescript-json-schema src/types/ConfigOptions.ts ConfigOptions --out rta-config.schema.json --noExtraProps --refs false --required --ignoreErrors",
         "buildRequestTypesSchema": "typescript-json-schema src/types/OnDeviceComponent.ts RequestType --out requestTypes.schema.json --ignoreErrors",
         "buildRequestArgsSchema": "typescript-json-schema src/types/OnDeviceComponent.ts RequestArgs --propOrder --out requestArgs.schema.json --ignoreErrors",
-        "buildRelease": "npx ts-node scripts/buildRelease.ts",
-        "buildRelease:alpha": "npx ts-node scripts/buildRelease.ts --alpha",
-        "buildRelease:beta": "npx ts-node scripts/buildRelease.ts --beta",
-        "buildRelease:dev": "npx ts-node scripts/buildRelease.ts --dev",
-        "increment:beta": "npm version prerelease"
+        "buildSchemas": "npm run buildConfigSchema && npm run buildRequestArgsSchema && npm run buildRequestTypesSchema",
+        "package": "npm run build && npm pack",
+        "pack:dev": "npm run package && node -e \"r=require,f='roku-test-automation-'+r('./package').version;r('fs').renameSync(f+'.tgz',f+`-dev.${Date.now()}.tgz`)\""
     },
     "repository": {
         "type": "git",

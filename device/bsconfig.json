@@ -1,5 +1,5 @@
 {
-	"rootDir": "device",
+	"rootDir": "./",
 	"plugins": [
 		"@rokucommunity/bslint"
 	]
