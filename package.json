@@ -57,7 +57,7 @@
         "@types/xmljs": "^0.3.2",
         "@typescript-eslint/eslint-plugin": "^5.22.0",
         "@typescript-eslint/parser": "^5.22.0",
-        "brighterscript": "^0.72.2",
+        "brighterscript": "^0.72.3",
         "chai": "^4.3.4",
         "chai-arrays": "^2.2.0",
         "dotenv": "^17.4.2",
@@ -71,6 +71,14 @@
         "typescript-json-schema": "^0.42.0",
         "wtfnode": "^0.8.4"
     },
+    "files": [
+        "dist/**/!(*.spec.*)*",
+        "device/**/*",
+        "rta-config.schema.json",
+        "requestArgs.schema.json",
+        "requestTypes.schema.json",
+        "base-rta-config.json"
+    ],
     "nyc": {
         "include": [
             "src/**/*.ts",
