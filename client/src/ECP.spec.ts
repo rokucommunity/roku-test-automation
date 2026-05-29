@@ -9,6 +9,7 @@ import * as sinonImport from 'sinon';
 const sinon = sinonImport.createSandbox();
 const expect = chai.expect;
 
+import { RokuDevice } from './RokuDevice';
 import { ECP } from './ECP';
 import * as testUtils from './test/testHelpers.spec';
 import type { ConfigOptions } from './types/ConfigOptions';
@@ -16,15 +17,19 @@ import type { AppUIResponse, AppUIResponseChild } from '.';
 
 describe('ECP', function () {
 	let ecp: ECP;
-	let device: testUtils.FakeRokuDevice;
+	let device: any;
 	let ecpResponse: any;
 	let ecpUtils: any;
 	let config: ConfigOptions;
 
 	beforeEach(() => {
-		device = new testUtils.FakeRokuDevice();
-		device.sendEcpPost = (() => ecpResponse) as any;
-		device.sendEcpGet = (() => ecpResponse) as any;
+		device = new RokuDevice();
+		sinon.stub(device, 'sendEcpPost').callsFake(() => {
+			return ecpResponse;
+		});
+		sinon.stub(device, 'sendEcpGet').callsFake(() => {
+			return ecpResponse;
+		});
 
 		config = {
 			RokuDevice: {
@@ -553,15 +558,216 @@ steps:
 		});
 	});
 
+	describe('getAppUI with ODC gap-filling', function () {
+		let appUIResponse: AppUIResponse;
+		let mockOdc: any;
+
+		beforeEach(async () => {
+			ecpResponse = await testUtils.getNeedleMockResponse('ECP/getAppUI/appUIResponseWithGaps');
+			mockOdc = {
+				assignElementIdOnAllNodes: sinon.stub().resolves({}),
+				getChildrenByElementId: sinon.stub().resolves({
+					results: {
+						'RTA_1': [
+							{ subtype: 'Group', id: 'containerGroup', uiElementId: 'RTA_2' },
+							{ subtype: 'Group', id: 'nestedGapGroup', uiElementId: 'RTA_8' },
+							{ subtype: 'Rectangle', id: 'noGapRect', uiElementId: 'RTA_12' }
+						],
+						'RTA_2': [
+							{ subtype: 'Rectangle', id: 'rect1', uiElementId: 'RTA_3' },
+							{ subtype: 'Timer', id: 'gapTimer', uiElementId: 'RTA_4' },
+							{ subtype: 'Poster', id: 'poster1', uiElementId: 'RTA_5' },
+							{ subtype: 'Animation', id: 'gapAnimation', uiElementId: 'RTA_6' },
+							{ subtype: 'Label', id: 'label1', uiElementId: 'RTA_7' }
+						],
+						'RTA_8': [
+							{ subtype: 'Task', id: 'gapTask', uiElementId: 'RTA_10' },
+							{ subtype: 'Rectangle', id: 'nestedRect', uiElementId: 'RTA_9' },
+							{ subtype: 'ContentNode', id: 'gapContent', uiElementId: 'RTA_11' }
+						]
+					},
+					timeTaken: 0
+				})
+			};
+		});
+
+		it('should call assignElementIdOnAllNodes before fetching', async () => {
+			await ecp.getAppUI(mockOdc);
+			expect(mockOdc.assignElementIdOnAllNodes.calledOnce).to.be.true;
+		});
+
+		it('should call getChildrenByElementId with elementIds for gap parents including scene', async () => {
+			await ecp.getAppUI(mockOdc);
+			expect(mockOdc.getChildrenByElementId.calledOnce).to.be.true;
+
+			const args = mockOdc.getChildrenByElementId.firstCall.args[0];
+			expect(args.requests).to.include('RTA_1');
+			expect(args.requests).to.include('RTA_2');
+			expect(args.requests).to.include('RTA_8');
+		});
+
+		it('should merge non-renderable children at correct positions', async () => {
+			appUIResponse = await ecp.getAppUI(mockOdc);
+			const containerGroup = appUIResponse.screen?.children?.[0]?.children?.[0];
+			expect(containerGroup?.children).to.have.length(5);
+			expect(containerGroup?.children?.[0].subtype).to.equal('Rectangle');
+			expect(containerGroup?.children?.[0].id).to.equal('rect1');
+			expect(containerGroup?.children?.[1].subtype).to.equal('Timer');
+			expect(containerGroup?.children?.[1].id).to.equal('gapTimer');
+			expect(containerGroup?.children?.[2].subtype).to.equal('Poster');
+			expect(containerGroup?.children?.[2].id).to.equal('poster1');
+			expect(containerGroup?.children?.[3].subtype).to.equal('Animation');
+			expect(containerGroup?.children?.[3].id).to.equal('gapAnimation');
+			expect(containerGroup?.children?.[4].subtype).to.equal('Label');
+			expect(containerGroup?.children?.[4].id).to.equal('label1');
+		});
+
+		it('should merge nested gap parents correctly', async () => {
+			appUIResponse = await ecp.getAppUI(mockOdc);
+			const nestedGapGroup = appUIResponse.screen?.children?.[0]?.children?.[1];
+			expect(nestedGapGroup?.children).to.have.length(3);
+			expect(nestedGapGroup?.children?.[0].subtype).to.equal('Task');
+			expect(nestedGapGroup?.children?.[0].id).to.equal('gapTask');
+			expect(nestedGapGroup?.children?.[1].subtype).to.equal('Rectangle');
+			expect(nestedGapGroup?.children?.[1].id).to.equal('nestedRect');
+			expect(nestedGapGroup?.children?.[2].subtype).to.equal('ContentNode');
+			expect(nestedGapGroup?.children?.[2].id).to.equal('gapContent');
+		});
+
+		it('should use scene base for all key paths', async () => {
+			appUIResponse = await ecp.getAppUI(mockOdc);
+			const sceneNode = appUIResponse.screen.children[0];
+			expect(sceneNode.base).to.equal('scene');
+			expect(sceneNode.keyPath).to.equal('');
+
+			function assertSceneBase(node: AppUIResponseChild) {
+				if (node.keyPath) {
+					expect(node.base).to.equal('scene');
+				}
+				for (const child of node.children ?? []) {
+					assertSceneBase(child);
+				}
+			}
+			assertSceneBase(sceneNode);
+		});
+
+		it('should generate correct index-based key paths after gap-filling', async () => {
+			appUIResponse = await ecp.getAppUI(mockOdc);
+			const containerGroup = appUIResponse.screen?.children?.[0]?.children?.[0];
+
+			expect(containerGroup?.keyPath).to.equal('#containerGroup');
+			expect(containerGroup?.children?.[0].keyPath).to.equal('#containerGroup.#rect1');
+			expect(containerGroup?.children?.[1].keyPath).to.equal('#containerGroup.#gapTimer');
+			expect(containerGroup?.children?.[2].keyPath).to.equal('#containerGroup.#poster1');
+			expect(containerGroup?.children?.[3].keyPath).to.equal('#containerGroup.#gapAnimation');
+			expect(containerGroup?.children?.[4].keyPath).to.equal('#containerGroup.#label1');
+		});
+
+		it('should use index-based key paths when ids are duplicated', async () => {
+			mockOdc.getChildrenByElementId.resolves({
+				results: {
+					'RTA_1': [
+						{ subtype: 'Group', id: 'containerGroup', uiElementId: 'RTA_2' },
+						{ subtype: 'Group', id: 'nestedGapGroup', uiElementId: 'RTA_8' },
+						{ subtype: 'Rectangle', id: 'noGapRect', uiElementId: 'RTA_12' }
+					],
+					'RTA_2': [
+						{ subtype: 'Rectangle', id: 'rect1', uiElementId: 'RTA_3' },
+						{ subtype: 'Timer', id: 'sameName', uiElementId: 'RTA_4' },
+						{ subtype: 'Poster', id: 'poster1', uiElementId: 'RTA_5' },
+						{ subtype: 'Animation', id: 'sameName', uiElementId: 'RTA_6' },
+						{ subtype: 'Label', id: 'label1', uiElementId: 'RTA_7' }
+					],
+					'RTA_8': [
+						{ subtype: 'Rectangle', id: 'nestedRect', uiElementId: 'RTA_9' }
+					]
+				},
+				timeTaken: 0
+			});
+			appUIResponse = await ecp.getAppUI(mockOdc);
+			const containerGroup = appUIResponse.screen?.children?.[0]?.children?.[0];
+
+			expect(containerGroup?.children?.[0].keyPath).to.equal('#containerGroup.#rect1');
+			expect(containerGroup?.children?.[1].keyPath).to.equal('#containerGroup.1');
+			expect(containerGroup?.children?.[1].id).to.equal('sameName');
+			expect(containerGroup?.children?.[2].keyPath).to.equal('#containerGroup.#poster1');
+			expect(containerGroup?.children?.[3].keyPath).to.equal('#containerGroup.3');
+			expect(containerGroup?.children?.[3].id).to.equal('sameName');
+			expect(containerGroup?.children?.[4].keyPath).to.equal('#containerGroup.#label1');
+		});
+
+		it('should always include scene as a gap parent even when totalChildren matches', async () => {
+			ecpResponse = await testUtils.getNeedleMockResponse('ECP/getAppUI/appUIResponseNoGaps');
+			mockOdc.getChildrenByElementId.resolves({
+				results: {
+					'RTA_1': [
+						{ subtype: 'Rectangle', id: 'rect1', uiElementId: 'RTA_2' },
+						{ subtype: 'Group', id: 'group1', uiElementId: 'RTA_3' }
+					]
+				},
+				timeTaken: 0
+			});
+			appUIResponse = await ecp.getAppUI(mockOdc);
+			expect(mockOdc.getChildrenByElementId.calledOnce).to.be.true;
+
+			const args = mockOdc.getChildrenByElementId.firstCall.args[0];
+			expect(args.requests).to.have.length(1);
+			expect(args.requests[0]).to.equal('RTA_1');
+		});
+
+		it('should leave nodes without gaps untouched', async () => {
+			appUIResponse = await ecp.getAppUI(mockOdc);
+			const noGapRect = appUIResponse.screen?.children?.[0]?.children?.[2];
+			expect(noGapRect?.id).to.equal('noGapRect');
+			expect(noGapRect?.subtype).to.equal('Rectangle');
+			expect(noGapRect?.children).to.be.undefined;
+		});
+
+		it('should skip gap-filling for ArrayGrid subtypes and preserve app-ui children', async () => {
+			mockOdc.getChildrenByElementId.resolves({
+				results: {
+					'RTA_1': [
+						{ subtype: 'Group', id: 'containerGroup', uiElementId: 'RTA_2' },
+						{ subtype: 'Group', id: 'nestedGapGroup', uiElementId: 'RTA_8' },
+						{ subtype: 'Rectangle', id: 'noGapRect', uiElementId: 'RTA_12' }
+					],
+					'RTA_2': [],
+					'RTA_8': [
+						{ subtype: 'Task', id: 'gapTask', uiElementId: 'RTA_10' },
+						{ subtype: 'Rectangle', id: 'nestedRect', uiElementId: 'RTA_9' },
+						{ subtype: 'ContentNode', id: 'gapContent', uiElementId: 'RTA_11' }
+					]
+				},
+				timeTaken: 0
+			});
+			appUIResponse = await ecp.getAppUI(mockOdc);
+
+			const containerGroup = appUIResponse.screen?.children?.[0]?.children?.[0];
+			expect(containerGroup?.children).to.have.length(3);
+			expect(containerGroup?.children?.[0].id).to.equal('rect1');
+			expect(containerGroup?.children?.[1].id).to.equal('poster1');
+			expect(containerGroup?.children?.[2].id).to.equal('label1');
+
+			const nestedGapGroup = appUIResponse.screen?.children?.[0]?.children?.[1];
+			expect(nestedGapGroup?.children).to.have.length(3);
+			expect(nestedGapGroup?.children?.[0].id).to.equal('gapTask');
+		});
+	});
+
 	describe('getAppUI', function () {
 		let appUIResponse: AppUIResponse;
+		let mockOdc: any;
 
 		beforeEach(async () => {
 			ecpResponse = await testUtils.getNeedleMockResponse('ECP/getAppUI/appUIResponse');
+			mockOdc = {
+				assignElementIdOnAllNodes: sinon.stub().resolves({}),
+				getChildrenByElementId: sinon.stub().resolves({ results: {}, timeTaken: 0 })
+			};
 		});
 
 		it('Should add the sceneBoundingRects for scene', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 
 			expect(appUIResponse.screen.children[0].sceneRect).to.haveOwnProperty('x');
 			expect(appUIResponse.screen.children[0].sceneRect).to.haveOwnProperty('y');
@@ -570,7 +776,7 @@ steps:
 		});
 
 		it('Should add the sceneBoundingRects for scene\'s children\'s children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 
 			for (const child of appUIResponse.screen?.children?.[0]?.children?.[4]?.children || []) {
 				expect(child.sceneRect).to.haveOwnProperty('x');
@@ -581,7 +787,7 @@ steps:
 		});
 
 		it('should not return a key path for RowListItem or internal MarkupGrid but should still create the correct key path for its children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const row1 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[7]?.children?.[0];
 			expect(row1?.subtype).to.equal('RowListItem');
 			expect(row1?.keyPath).to.be.undefined;
@@ -596,7 +802,7 @@ steps:
 		});
 
 		it('should return correct position for a node with offset bounds due to children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rect3 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0].children?.[2].children?.[0];
 			expect(rect3?.keyPath).to.equal('#pagesContainerGroup.0.#rect2.#rect3');
 			expect(rect3?.sceneRect?.height).to.equal(50);
@@ -606,7 +812,7 @@ steps:
 		});
 
 		it('should return correct position for a node with offset bounds due to children', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const offsetGroup = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0].children?.[3];
 			expect(offsetGroup?.keyPath).to.equal('#pagesContainerGroup.0.#offsetGroup');
 			expect(offsetGroup?.sceneRect?.height).to.equal(100);
@@ -616,7 +822,7 @@ steps:
 		});
 
 		it('should return correct position for a RowList item', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rowListItemComponent0 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[7]?.children?.[0].children?.[2].children?.[0];
 			expect(rowListItemComponent0?.keyPath).to.equal('#pagesContainerGroup.0.#rowListWithoutCustomTitleComponent.0.items.0');
 			expect(rowListItemComponent0?.sceneRect?.height).to.equal(150);
@@ -626,7 +832,7 @@ steps:
 		});
 
 		it('should return correct position for the second row RowList item', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rowListItemComponent1_0 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[7]?.children?.[1].children?.[2].children?.[0];
 			expect(rowListItemComponent1_0?.keyPath).to.equal('#pagesContainerGroup.0.#rowListWithoutCustomTitleComponent.1.items.0');
 			expect(rowListItemComponent1_0?.sceneRect?.height).to.equal(150);
@@ -636,7 +842,7 @@ steps:
 		});
 
 		it('should return correct position for a custom row title element', async () => {
-			appUIResponse = await ecp.getAppUI();
+			appUIResponse = await ecp.getAppUI(mockOdc);
 			const rowListCustomRowTitle0 = appUIResponse.screen?.children?.[0]?.children?.[4]?.children?.[0]?.children?.[8]?.children?.[0].children?.[0].children?.[0];
 			expect(rowListCustomRowTitle0?.keyPath).to.equal('#pagesContainerGroup.0.#rowListWithCustomTitleComponent.0.title');
 			expect(rowListCustomRowTitle0?.sceneRect?.height).to.equal(36);

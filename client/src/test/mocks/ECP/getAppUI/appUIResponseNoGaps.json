@@ -1,0 +1,97 @@
+{
+	"name": "app-ui",
+	"value": "",
+	"attributes": {},
+	"children": [
+		{
+			"name": "status",
+			"value": "OK",
+			"attributes": {},
+			"children": []
+		},
+		{
+			"name": "topscreen",
+			"value": "",
+			"attributes": {},
+			"children": [
+				{
+					"name": "plugin",
+					"value": "",
+					"attributes": {
+						"id": "dev",
+						"name": "TestChannel"
+					},
+					"children": []
+				},
+				{
+					"name": "screen",
+					"value": "",
+					"attributes": {
+						"type": "SGScreen",
+						"focused": "true"
+					},
+					"children": [
+						{
+							"name": "NoGapScene",
+							"value": "",
+							"attributes": {
+								"children": "2",
+								"extends": "Scene",
+								"focused": "true",
+								"focusable": "true",
+								"rcid": "0",
+								"uiElementId": "RTA_1",
+								"bounds": "{0, 0, 1920, 1080}"
+							},
+							"children": [
+								{
+									"name": "Rectangle",
+									"value": "",
+									"attributes": {
+										"name": "rect1",
+										"rcid": "0",
+										"uiElementId": "RTA_2",
+										"bounds": "{0, 0, 100, 100}",
+										"color": "#ff0000ff",
+										"children": "0",
+										"index": "0"
+									},
+									"children": []
+								},
+								{
+									"name": "RenderableNode",
+									"value": "",
+									"attributes": {
+										"children": "1",
+										"name": "group1",
+										"rcid": "0",
+										"uiElementId": "RTA_3",
+										"bounds": "{200, 0, 500, 500}",
+										"index": "1"
+									},
+									"children": [
+										{
+											"name": "Label",
+											"value": "",
+											"attributes": {
+												"name": "label1",
+												"rcid": "0",
+												"uiElementId": "RTA_4",
+												"bounds": "{0, 0, 200, 50}",
+												"text": "Hello",
+												"color": "#ffffffff",
+												"children": "0",
+												"index": "0"
+											},
+											"children": []
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

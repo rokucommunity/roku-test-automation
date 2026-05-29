@@ -5,7 +5,26 @@ import { argv } from 'process';
 
 let output: any;
 
-if (argv[2] !== '--dev') {
+// Parse OTP parameter (handles both --otp=123456 and --otp 123456)
+let otp: string | null = null;
+const otpArg = argv.find(arg => arg.startsWith('--otp'));
+if (otpArg) {
+	if (otpArg.includes('=')) {
+		otp = otpArg.split('=')[1];
+	} else {
+		const otpIndex = argv.indexOf('--otp');
+		otp = otpIndex !== -1 ? argv[otpIndex + 1] : null;
+	}
+}
+
+// Determine release type (exclude --otp and its value from type checking)
+const releaseType = argv.find((arg, i) => {
+	if (arg.startsWith('--otp')) return false;
+	if (i > 0 && argv[i - 1] === '--otp') return false;
+	return ['--dev', '--beta', '--alpha'].includes(arg);
+});
+
+if (releaseType !== '--dev') {
 	output = execSync('npm run build', {
 		encoding: 'utf8'
 	});
@@ -43,18 +62,24 @@ for (const resourceMapping of resourcesToCopy) {
 	});
 }
 
-if (argv[2] === '--dev') {
+if (releaseType === '--dev') {
 	output = execSync(`cd ${outputFolder} && npm pack`, {
 		encoding: 'utf8'
 	});
 } else {
 	let options = '';
-	if (argv[2] === '--beta') {
+	if (releaseType === '--beta') {
 		options = '--tag beta';
-	} else if (argv[2] === '--alpha') {
+	} else if (releaseType === '--alpha') {
 		options = '--tag alpha';
 	}
-	output = execSync(`npm publish ${options} '${outputFolder}'`, {
+	if (otp) {
+		options += ` --otp=${otp}`;
+	}
+
+	const command = `npm publish ${options} '${outputFolder}'`;
+	console.log(`Running command: ${command}`);
+	output = execSync(command, {
 		encoding: 'utf8'
 	});
 }

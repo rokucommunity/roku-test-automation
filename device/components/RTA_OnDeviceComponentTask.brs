@@ -44,8 +44,8 @@ sub setValidRequestTypes()
 		"getApplicationStartTime": {
 			"handler": processGetApplicationStartTimeRequest
 		}
-		"getServerHost": {
-			"handler": processGetServerHostRequest
+		"getClientHost": {
+			"handler": processGetClientHostRequest
 		}
 	}
 end sub
@@ -458,7 +458,7 @@ sub processGetApplicationStartTimeRequest(request as Object)
 	})
 end sub
 
-sub processGetServerHostRequest(request as Object)
+sub processGetClientHostRequest(request as Object)
 	socket = m.clientSockets[request.socketId]
 	if socket <> invalid then
 		sendResponseToClient(request, {
@@ -508,10 +508,13 @@ sub sendResponseToClient(request as Object, response as Object, binaryPayloadByt
 		RTA_logError("Could not send back response for requestType: " + json.type, stringPayload)
 		return
 	else
-		if stringPayload.len() < 1024 then
-			RTA_logDebug("Sending back response for requestType: " + json.type, stringPayload)
-		else
-			RTA_logDebug("Sending back large response (id: " + json.id + ", requestType: " + json.type + ", timeTaken: " + response.timeTaken.toStr() + ")")
+		if RTA_canLog("debug") then
+			length = stringPayload.len()
+			if length < 1000 then
+				RTA_logDebug("Sending back response for requestType: " + json.type, stringPayload)
+			else
+				RTA_logDebug("Sending back large response (id: " + json.id + ", requestType: " + json.type + ", timeTaken: " + response.timeTaken.toStr() + ", length: " + length.toStr() + ")")
+			end if
 		end if
 	end if
 

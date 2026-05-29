@@ -17,10 +17,6 @@ import { NetworkProxy } from './NetworkProxy';
 const proxy = new NetworkProxy(odc);
 export { NetworkProxy, proxy };
 
-import { Suitest } from './Suitest';
-const suitest = new Suitest(ecp, odc);
-export { Suitest, suitest };
-
 export * from './types/AppUIResponse';
 export * from './types/ActiveAppResponse';
 export * from './types/ConfigOptions';

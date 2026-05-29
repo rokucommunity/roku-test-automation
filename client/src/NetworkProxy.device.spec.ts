@@ -1,6 +1,5 @@
 import * as chai from 'chai';
 const expect = chai.expect;
-import * as path from 'path';
 import * as portfinder from 'portfinder';
 import * as needle from 'needle';
 import type * as http from 'http';
@@ -110,7 +109,7 @@ describe('NetworkProxy', function () {
 	});
 
 
-	it.skip('should be able to intercept a request on device', async () => {
+	it('should be able to intercept a request on device', async () => {
 		let resolve;
 		const promise = new Promise((res) => {
 			resolve = res;
