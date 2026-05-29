@@ -18,10 +18,6 @@ jobs:
   copilot-setup-steps:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: client
-
     # Set the permissions to the lowest permissions possible needed for your steps.
     # Copilot will be given its own token for its operations.
     permissions:
