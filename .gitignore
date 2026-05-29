@@ -2,7 +2,7 @@ node_modules
 dist
 .nyc_output
 coverage
-client/rta-config.json
+./rta-config.json
 out
 .env
 tsconfig.tsbuildinfo

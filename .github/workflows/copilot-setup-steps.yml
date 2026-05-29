@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: "18.20.4"
           cache: "npm"
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install JavaScript dependencies
         run: npm ci
