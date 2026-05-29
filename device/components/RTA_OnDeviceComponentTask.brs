@@ -44,8 +44,8 @@ sub setValidRequestTypes()
 		"getApplicationStartTime": {
 			"handler": processGetApplicationStartTimeRequest
 		}
-		"getServerHost": {
-			"handler": processGetServerHostRequest
+		"getClientHost": {
+			"handler": processGetClientHostRequest
 		}
 	}
 end sub
@@ -458,7 +458,7 @@ sub processGetApplicationStartTimeRequest(request as Object)
 	})
 end sub
 
-sub processGetServerHostRequest(request as Object)
+sub processGetClientHostRequest(request as Object)
 	socket = m.clientSockets[request.socketId]
 	if socket <> invalid then
 		sendResponseToClient(request, {
