@@ -1,6 +1,5 @@
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
-import * as rimraf from 'rimraf';
 import { execSync } from 'child_process';
 import { argv } from 'process';
 
@@ -35,7 +34,7 @@ if (releaseType !== '--dev') {
 const clientSourceFolder = path.resolve(__dirname + '/..');
 const outputFolder = path.resolve(__dirname + '/../../release');
 
-rimraf.sync(outputFolder);
+fsExtra.removeSync(outputFolder);
 
 output = execSync(`npm run buildConfigSchema && npm run buildRequestArgsSchema && npm run buildRequestTypesSchema`, {
 	encoding: 'utf8'

@@ -9,16 +9,22 @@ import * as assert from 'assert';
 import { utils } from './utils';
 import type * as ODC from './types/OnDeviceComponent';
 import { ecp, odc, device } from '.';
+import { setupTestEnvironment } from './test/testHelpers.spec';
 
 // Used to unwrap promise return types to get the true value
 type Unwrap<T> = T extends Promise<infer U> ? U : T extends (...args: any) => Promise<infer U> ? U : T extends (...args: any) => infer U ? U : T;
 
 describe('OnDeviceComponent', function () {
 	before(async () => {
+		setupTestEnvironment();
 		await device.deploy({
 			rootDir: '../testProject',
 			preventMultipleDeployments: true
 		});
+	});
+
+	after(async () => {
+		await odc.shutdown();
 	});
 
 	describe('getAllCount', function () {

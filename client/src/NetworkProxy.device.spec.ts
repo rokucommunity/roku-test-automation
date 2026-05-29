@@ -7,6 +7,7 @@ import * as express from 'express';
 
 import { utils } from './utils';
 import { ecp, odc, device, proxy } from '.';
+import { setupTestEnvironment } from './test/testHelpers.spec';
 
 describe('NetworkProxy', function () {
 	let testServer: http.Server;
@@ -15,6 +16,7 @@ describe('NetworkProxy', function () {
 	let proxyPort: number;
 
 	before(async () => {
+		setupTestEnvironment();
 		await device.deploy({
 			rootDir: '../testProject',
 			preventMultipleDeployments: true
@@ -64,14 +66,14 @@ describe('NetworkProxy', function () {
 
 
 	it('should be able to intercept a request off device', async () => {
-		const originalRequestBody = {original: true};
+		const originalRequestBody = { original: true };
 		const testUrl = `http://127.0.0.1:${testServerPort}/test?key=value`;
 
 		const removeCallback = proxy.addCallback({
 			shouldProcess: (args) => {
 				return args.url === testUrl;
 			},
-			processRequest: ({url, requestBody}) => {
+			processRequest: ({ url, requestBody }) => {
 				expect(!!requestBody).to.be.true;
 				expect(url).to.equal(testUrl);
 
@@ -80,7 +82,7 @@ describe('NetworkProxy', function () {
 					overrideRequest: true,
 				});
 			},
-			processResponse: ({responseBuffer}) => {
+			processResponse: ({ responseBuffer }) => {
 				expect(serverReceivedRequest.body.overrideRequest).to.be.true;
 
 				const serverResponse = JSON.parse(responseBuffer.toString());
@@ -95,7 +97,7 @@ describe('NetworkProxy', function () {
 		});
 
 		const options = {
-			headers: { 'Content-Type': 'application/json'}
+			headers: { 'Content-Type': 'application/json' }
 		};
 
 		const promise = needle('post', `http://127.0.0.1:${proxyPort}/;${testUrl}`, JSON.stringify(originalRequestBody), options);
@@ -115,14 +117,14 @@ describe('NetworkProxy', function () {
 
 		const imageHostName = 'picsum.photos';
 		const randomQuery = Math.random().toString();
-		const imagePath =  '/600/?r=' + randomQuery;
+		const imagePath = '/600/?r=' + randomQuery;
 		const imageUrl = `http://${imageHostName}${imagePath}`;
 
 		const removeCallback = proxy.addCallback({
-			shouldProcess: ({url}) => {
+			shouldProcess: ({ url }) => {
 				return imageUrl === url;
 			},
-			processRequest: ({url, path, hostname, query}) => {
+			processRequest: ({ url, path, hostname, query }) => {
 				expect(hostname).to.equal(imageHostName);
 				expect(path).to.equal(imagePath);
 				expect(query?.r).to.equal(randomQuery);
