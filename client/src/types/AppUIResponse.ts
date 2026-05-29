@@ -19,6 +19,8 @@ export interface AppUIResponseChild {
 	sceneRect?: BoundingRect;
 	bounds?: number[];
 	children?: AppUIResponseChild[];
+	/** The total number of children this node has on the device, including non-renderable nodes that are excluded from the app-ui response */
+	totalChildren?: number;
 	color?: string;
 	extends?: string;
 	focusable?: boolean;
