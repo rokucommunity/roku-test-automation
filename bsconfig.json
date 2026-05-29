@@ -1,10 +1,6 @@
 {
-	"rootDir": "../device",
-	"retainStagingDir": true,
-	"plugins": [ "@rokucommunity/bslint" ],
-	"files": [
-		"components/**/*.+(xml|brs)",
-		"source/**/*.+(brs)",
-		"manifest"
+	"rootDir": "device",
+	"plugins": [
+		"@rokucommunity/bslint"
 	]
 }
