@@ -1,5 +1,4 @@
-import { utils } from './utils';
-export { utils };
+export { utils } from './utils';
 
 import { RokuDevice } from './RokuDevice';
 const device = new RokuDevice();

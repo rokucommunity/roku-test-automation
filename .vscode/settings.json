@@ -10,5 +10,6 @@
         "**/node_modules": true,
         "**/.nyc_output": true,
         "**/Thumbs.db": true
-    }
+    },
+    "js/ts.tsdk.path": "node_modules/typescript/lib",
 }
