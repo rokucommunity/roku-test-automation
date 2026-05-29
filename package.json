@@ -2,8 +2,8 @@
     "name": "roku-test-automation",
     "version": "2.2.2",
     "description": "Helps with automating functional tests",
-    "main": "client/dist/index.js",
-    "typings": "client/dist/index.d.ts",
+    "main": "dist/index.js",
+    "typings": "dist/index.d.ts",
     "scripts": {
         "preversion": "npm run build && npm run lint && npm run test && npm run validate-client",
         "build": "npm run clean && tsc",

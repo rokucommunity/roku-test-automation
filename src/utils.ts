@@ -35,7 +35,7 @@ class Utils {
 
 	/** Provides a way to easily get a path to device files for external access */
 	public getDeviceFilesPath() {
-		return this.getPath().resolve(__dirname + '/../../device');
+		return this.getPath().resolve(__dirname + '/../device');
 	}
 
 	/** Provides a way to easily get a path to client files for external access */
@@ -47,7 +47,7 @@ class Utils {
 		return JSON.parse(this.getFsExtra().readFileSync(filePath, 'utf-8'));
 	}
 
-	public getMatchingDevices(config: ConfigOptions, deviceSelector: Record<string, any>): { [key: string]: DeviceConfigOptions} {
+	public getMatchingDevices(config: ConfigOptions, deviceSelector: Record<string, any>): { [key: string]: DeviceConfigOptions } {
 		const matchingDevices = {};
 		config.RokuDevice.devices.forEach((device, index) => {
 			for (const key in deviceSelector) {
@@ -75,13 +75,17 @@ class Utils {
 		let config: ConfigOptions;
 		try {
 			config = this.parseJsonFile(configFilePath);
-		} catch(e) {
-			throw utils.makeError('NoConfigFound', 'Config could not be found or parsed correctly.');
+		} catch (e) {
+			throw utils.makeError('NoConfigFound', `Config could not be found or parsed correctly: '${configFilePath}`);
 		}
 		parentConfigPaths.push(configFilePath);
 
 		if (config.extends) {
-			const baseConfigFilePath = this.getPath().resolve(config.extends);
+			//always resolve the "extends" path relative to the config file that is doing the extending
+			const baseConfigFilePath = this.getPath().resolve(
+				this.getPath().dirname(configFilePath),
+				config.extends
+			);
 			if (parentConfigPaths.includes(baseConfigFilePath)) {
 				throw new Error(`Circular dependency detected. '${baseConfigFilePath}' has already been included`);
 			}
@@ -256,13 +260,13 @@ class Utils {
 	}
 
 	public isObjectWithProperty<Y extends PropertyKey>
-    (obj: any, prop: Y): obj is Record<Y, unknown> {
-        if (obj === null || typeof obj !== 'object') {
-            return false;
-        }
-        // eslint-disable-next-line no-prototype-builtins
-        return obj.hasOwnProperty(prop);
-    }
+		(obj: any, prop: Y): obj is Record<Y, unknown> {
+		if (obj === null || typeof obj !== 'object') {
+			return false;
+		}
+		// eslint-disable-next-line no-prototype-builtins
+		return obj.hasOwnProperty(prop);
+	}
 
 	public convertValueToNumber(value: string | number | undefined, defaultValue = 0) {
 		if (typeof value === 'number') {
@@ -278,14 +282,14 @@ class Utils {
 	}
 
 	public randomInteger(max = 2147483647, min = 0) {
-		return Math.floor(Math.random() * (max - min + 1) ) + min;
+		return Math.floor(Math.random() * (max - min + 1)) + min;
 	}
 
 	public findNodesAtLocation(args: { appUIResponse: AppUIResponse, x: number, y: number, includeMatchesWithoutKeyPath?: boolean }) {
 		const matches = [] as AppUIResponseChild[];
-		this.findNodesAtLocationCore({...args , children: args.appUIResponse.screen.children, matches: matches});
+		this.findNodesAtLocationCore({ ...args, children: args.appUIResponse.screen.children, matches: matches });
 
-		const {x, y} = args;
+		const { x, y } = args;
 
 		// We now want to sort our matches to try and return the best one first
 		matches.sort((a, b) => {
@@ -316,10 +320,10 @@ class Utils {
 		};
 	}
 
-	private findNodesAtLocationCore(args: {x: number, y: number, children: AppUIResponseChild[], matches: AppUIResponseChild[], isArrayGridChild?: boolean, includeMatchesWithoutKeyPath?: boolean}) {
+	private findNodesAtLocationCore(args: { x: number, y: number, children: AppUIResponseChild[], matches: AppUIResponseChild[], isArrayGridChild?: boolean, includeMatchesWithoutKeyPath?: boolean }) {
 		let isArrayGridChild = args.isArrayGridChild ?? false;
 
-		const {x, y, children, matches} = args;
+		const { x, y, children, matches } = args;
 
 		for (const child of children) {
 			let isLocationWithinNodeDimensions = false;
@@ -341,7 +345,7 @@ class Utils {
 				}
 
 				if (child.children?.length) {
-					this.findNodesAtLocationCore({x: x, y: y, children: child.children, matches: matches, isArrayGridChild: isArrayGridChild});
+					this.findNodesAtLocationCore({ x: x, y: y, children: child.children, matches: matches, isArrayGridChild: isArrayGridChild });
 				}
 			}
 		}

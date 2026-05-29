@@ -9,7 +9,7 @@ import * as path from 'path';
 
 import {utils} from './utils';
 
-const tempDir = path.resolve(__dirname, '../../.tmp');
+const tempDir = path.resolve(__dirname, '../.tmp');
 
 describe('utils', function () {
 	beforeEach(() => {
