@@ -422,7 +422,7 @@ describe('OnDeviceComponent', function () {
 				it('should work on node item', async () => {
 					const { value } = await odc.getValue({ base: 'global', keyPath: 'AuthManager.keys()' });
 					expect(value).to.be.instanceof(Array);
-					expect(value[0]).to.equal('change');
+					expect(value[0]).to.equal('id');
 				});
 
 				it('should gracefully fallback if called on nonsupported type', async () => {
@@ -596,8 +596,8 @@ describe('OnDeviceComponent', function () {
 				});
 
 				expect(value.loopingNode).to.be.an('object');
-				expect(Object.keys(value.loopingNode)).to.have.lengthOf(2);
-				expect(Object.keys(value.loopingNode)).to.have.members(['id', 'subtype']);
+				expect(Object.keys(value.loopingNode)).to.have.lengthOf(3);
+				expect(Object.keys(value.loopingNode)).to.have.members(['id', 'subtype', 'uiElementId']);
 				expect(value.loopingNode).to.have.property('subtype', 'Group');
 			});
 

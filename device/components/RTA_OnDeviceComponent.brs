@@ -1137,7 +1137,7 @@ function recursivelyConvertValueToJsonCompatible(value as Object, maxChildDepth 
 		end if
 
 		value.subtype = node.subtype()
-		value.uiElementId = node.getUIElementId()
+		value["uiElementId"] = node.getUIElementId()
 	end if
 
 	return value
