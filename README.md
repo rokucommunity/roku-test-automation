@@ -1,5 +1,13 @@
 # Roku Test Automation
 
+[![build status](https://img.shields.io/github/actions/workflow/status/rokucommunity/roku-test-automation/build.yml?branch=master&logo=github)](https://github.com/rokucommunity/roku-test-automation/actions?query=branch%3Amaster+workflow%3Abuild)
+[![security](https://img.shields.io/github/actions/workflow/status/rokucommunity/roku-test-automation/security-audit.yml?branch=master&label=security&logo=data:image/svg%2Bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNiAxNiI+PHJlY3QgeD0iMyIgeT0iOCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjciIHJ4PSIxIiBmaWxsPSJ3aGl0ZSIvPjxwYXRoIGQ9Ik01IDhWNWEzIDMgMCAwIDEgNiAwdjMiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMiIvPjwvc3ZnPg==)](https://github.com/rokucommunity/roku-test-automation/actions/workflows/security-audit.yml)
+[![coverage status](https://img.shields.io/coveralls/github/rokucommunity/roku-test-automation?logo=coveralls)](https://coveralls.io/github/rokucommunity/roku-test-automation?branch=master)
+[![monthly downloads](https://img.shields.io/npm/dm/roku-test-automation.svg?sanitize=true&logo=npm&logoColor=&label=npm)](https://npmcharts.com/compare/roku-test-automation?minimal=true)
+[![npm version](https://img.shields.io/npm/v/roku-test-automation.svg?logo=npm&label=npm)](https://www.npmjs.com/package/roku-test-automation)
+[![license](https://img.shields.io/npm/l/roku-test-automation.svg)](LICENSE)
+[![Slack](https://img.shields.io/badge/Slack-RokuCommunity-4A154B?logo=slack)](https://join.slack.com/t/rokudevelopers/shared_invite/zt-4vw7rg6v-NH46oY7hTktpRIBM_zGvwA)
+
 - [Intro](#intro)
 - [v3.0 Changes](#v30-changes)
 - [v2.0 Changes](#v20-changes)
@@ -38,7 +46,7 @@ Roku Test Automation (RTA from here on out) helps with automating functional tes
 
 ## Contributing & Getting Help
 
-There is always more things that we would like to add than we have time for. If you would like to help contribute the best spot to reach out is in the [Roku Developers Slack](https://join.slack.com/t/rokudevelopers/shared_invite/zt-4vw7rg6v-NH46oY7hTktpRIBM_zGvwA). (We're in the #rta channel). If you are having trouble getting RTA working feel free to reach out there as well. If you see an issue or would like to see something added then feel free to [create a new Github Issue](https://github.com/triwav/roku-test-automation/issues/new)
+There is always more things that we would like to add than we have time for. If you would like to help contribute the best spot to reach out is in the [Roku Developers Slack](https://join.slack.com/t/rokudevelopers/shared_invite/zt-4vw7rg6v-NH46oY7hTktpRIBM_zGvwA). (We're in the #rta channel). If you are having trouble getting RTA working feel free to reach out there as well. If you see an issue or would like to see something added then feel free to [create a new Github Issue](https://github.com/rokucommunity/roku-test-automation/issues/new)
 
 ## v3.0 Changes
 
@@ -94,7 +102,7 @@ Currently the only necessary part of the config is at least one device host and 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/triwav/roku-test-automation/master/client/rta-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/client/rta-config.schema.json",
   "RokuDevice": {
     "devices": [
       {
@@ -196,7 +204,7 @@ console.log('Duration:', player.duration);
 
 ### `OnDeviceComponent`
 
-The core piece of RTA is the OnDeviceComponent. It functions similarly to [Roku's RALE](https://devtools.web.roku.com/roku-advanced-layout-editor/) in that you have a component that is initialized on the device as used in the testProject [here](https://github.com/triwav/roku-test-automation/blob/master/testProject/components/MainScene.brs#L4).
+The core piece of RTA is the OnDeviceComponent. It functions similarly to [Roku's RALE](https://devtools.web.roku.com/roku-advanced-layout-editor/) in that you have a component that is initialized on the device as used in the testProject [here](https://github.com/rokucommunity/roku-test-automation/blob/master/testProject/components/MainScene.brs#L4).
 
 ```vb
 m.odc = createObject("roSGNode", "RTA_OnDeviceComponent")
