@@ -23,6 +23,12 @@
 			"runOptions": {
 				"runOn": "folderOpen"
 			}
+		},
+		{
+			"label": "compile-automated-tests",
+			"type": "typescript",
+			"tsconfig": "testProject/tsconfig.json",
+			"problemMatcher": []
 		}
 	]
 }
