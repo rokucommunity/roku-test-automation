@@ -31,11 +31,8 @@
 			"type": "brightscript",
 			"request": "launch",
 			"name": "Deploy testProject",
-			"cwd": "${workspaceFolder}/testProject",
+			"rootDir": "${workspaceFolder}/testProject",
 			"retainStagingFolder": true,
-			"envFile": "${workspaceFolder}/.env",
-			"host": "${env:LAUNCH_HOST_OVERRIDE}",
-			"password": "${env:ROKU_PASSWORD}",
 			"internalConsoleOptions": "neverOpen",
 			"logLevel": "error",
 			"stopDebuggerOnAppExit": true,
@@ -44,19 +41,6 @@
 			"bsConst": {
 				"ENABLE_RTA": false
 			}
-		},
-		{
-			"type": "node",
-			"request": "launch",
-			"name": "Run testProject Tests",
-			"cwd": "${workspaceFolder}/testProject",
-			"preLaunchTask": "compile-automated-tests",
-			"program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
-			"args": [
-				"./dist/automatedTests/**/*.spec.js"
-			],
-			"console": "integratedTerminal",
-			"internalConsoleOptions": "neverOpen"
 		}
 	]
 }
