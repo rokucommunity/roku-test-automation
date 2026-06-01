@@ -10,3 +10,4 @@ release
 requestArgs.schema.json
 requestTypes.schema.json
 *.tgz
+.tmp

@@ -8,9 +8,9 @@
 			"cwd": "${workspaceFolder}",
 			"program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
 			"args": [
-				"--bail",
-				"./dist/ECP.spec.js",
-				"./dist/utils.spec.js"
+				"./src/**/*.spec.ts",
+				"--ignore",
+				"./src/**/*.device.spec.ts"
 			],
 			"console": "internalConsole",
 			"internalConsoleOptions": "neverOpen"
@@ -22,14 +22,9 @@
 			"cwd": "${workspaceFolder}",
 			"program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
 			"args": [
-				"--grep",
-				"\\[SLOW\\]",
-				"--invert",
-				"./dist/OnDeviceComponent.spec.js",
-				"./dist/RokuDevice.spec.js",
-				"./dist/NetworkProxy.spec.js"
-			], // "--bail"
-			"console": "integratedTerminal",
+				"./src/**/*.device.spec.ts"
+			],
+			"console": "internalConsole",
 			"internalConsoleOptions": "neverOpen"
 		},
 		{
