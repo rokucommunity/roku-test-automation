@@ -12,4 +12,5 @@
         "**/Thumbs.db": true
     },
     "js/ts.tsdk.path": "node_modules/typescript/lib",
+    "brightscript.format.bsfmtPath": "bsfmt.json"
 }

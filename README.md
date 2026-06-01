@@ -102,7 +102,7 @@ Currently the only necessary part of the config is at least one device host and 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/client/rta-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/rta-config.schema.json",
   "RokuDevice": {
     "devices": [
       {
@@ -159,9 +159,9 @@ RTA contains most of the standard ECP commands including:
 - Getting the current active app
 - Getting the media player
 
-In addition, with the recent requirement for login and logout scripts, the following methods have been added:  
-`startRaspFileCreation`  
-`finishRaspFileCreation`  
+In addition, with the recent requirement for login and logout scripts, the following methods have been added:
+`startRaspFileCreation`
+`finishRaspFileCreation`
 and a copy of [`utils.sleep`](#sleep) that also includes a pause in your rasp file.
 
 #### Key ECP Methods

@@ -75,8 +75,7 @@
         "!**/bsconfig.json",
         "rta-config.schema.json",
         "requestArgs.schema.json",
-        "requestTypes.schema.json",
-        "base-rta-config.json"
+        "requestTypes.schema.json"
     ],
     "nyc": {
         "include": [
