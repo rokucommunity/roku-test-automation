@@ -38,6 +38,9 @@
 			"stopDebuggerOnAppExit": true,
 			"injectRaleTrackerTask": false,
 			"injectRdbOnDeviceComponent": true,
+			"envFile": "${workspaceFolder}/.env",
+			"host": "${env:ROKU_HOST}",
+			"password": "${env:ROKU_PASSWORD}",
 			"bsConst": {
 				"ENABLE_RTA": false
 			}
