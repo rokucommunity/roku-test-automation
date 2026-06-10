@@ -11,9 +11,6 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    defaults:
-      run:
-        working-directory: client
     steps:
       - uses: actions/checkout@master
       - uses: actions/setup-node@master
@@ -32,4 +29,4 @@ jobs:
           #hardcode the coveralls token...it's not overly important to protect, and github actions won't allow forks to work with coveralls otherwise
           COVERALLS_REPO_TOKEN: "F6lSsESQszSbdnLURxBkCbj7gE5uZKTaz"
         with:
-          path-to-lcov: ./client/coverage/lcov.info
+          path-to-lcov: ./coverage/lcov.info

@@ -1,7 +1,7 @@
 {
-    "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/client/rta-config.schema.json",
-    "extends": "../client/base-rta-config.json",
+    "$schema": "../rta-config.schema.json",
     "RokuDevice": {
+        "clientDebugLogging": false,
         "devices": [
             {
                 "host": null,
@@ -12,5 +12,25 @@
             }
         ],
         "deviceIndex": 0
+    },
+    "OnDeviceComponent": {
+        "logLevel": "error",
+        "clientDebugLogging": false,
+        "disableCallOriginationLine": false,
+        "disableTelnet": true,
+        "helperInjection": {
+            "componentPaths": [
+                "components/MainScene.xml"
+            ]
+        }
+    },
+    "NetworkProxy": {
+        "clientDebugLogging": false
+    },
+    "ECP": {
+        "default": {
+            "keypressDelay": 0,
+            "launchChannelId": "dev"
+        }
     }
 }

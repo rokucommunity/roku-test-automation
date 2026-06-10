@@ -1,0 +1,16 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/dist": true,
+        "**/coverage": true,
+        "**/out": true,
+        "**/node_modules": true,
+        "**/.nyc_output": true,
+        "**/Thumbs.db": true
+    },
+    "js/ts.tsdk.path": "node_modules/typescript/lib",
+    "brightscript.format.bsfmtPath": "bsfmt.json"
+}

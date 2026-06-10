@@ -1,0 +1,49 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug Non-Device Tests",
+			"type": "node",
+			"request": "launch",
+			"cwd": "${workspaceFolder}",
+			"program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+			"args": [
+				"./src/**/*.spec.ts",
+				"--ignore",
+				"./src/**/*.device.spec.ts"
+			],
+			"console": "internalConsole",
+			"internalConsoleOptions": "neverOpen"
+		},
+		{
+			"name": "Debug Device Tests",
+			"type": "node",
+			"request": "launch",
+			"cwd": "${workspaceFolder}",
+			"program": "${workspaceFolder}/node_modules/mocha/bin/_mocha",
+			"args": [
+				"./src/**/*.device.spec.ts"
+			],
+			"console": "internalConsole",
+			"internalConsoleOptions": "neverOpen"
+		},
+		{
+			"type": "brightscript",
+			"request": "launch",
+			"name": "Deploy testProject",
+			"rootDir": "${workspaceFolder}/testProject",
+			"retainStagingFolder": true,
+			"internalConsoleOptions": "neverOpen",
+			"logLevel": "error",
+			"stopDebuggerOnAppExit": true,
+			"injectRaleTrackerTask": false,
+			"injectRdbOnDeviceComponent": true,
+			"envFile": "${workspaceFolder}/.env",
+			"host": "${env:ROKU_HOST}",
+			"password": "${env:ROKU_PASSWORD}",
+			"bsConst": {
+				"ENABLE_RTA": false
+			}
+		}
+	]
+}

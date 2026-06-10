@@ -1,0 +1,6 @@
+{
+	"rootDir": "./",
+	"plugins": [
+		"@rokucommunity/bslint"
+	]
+}

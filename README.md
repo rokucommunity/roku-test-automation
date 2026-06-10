@@ -102,7 +102,7 @@ Currently the only necessary part of the config is at least one device host and 
 
 ```json
 {
-  "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/client/rta-config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/rokucommunity/roku-test-automation/master/rta-config.schema.json",
   "RokuDevice": {
     "devices": [
       {
@@ -130,7 +130,7 @@ To keep a single config file and aid in running multiple tests at once, RTA read
 utils.setupEnvironmentFromConfigFile('<PATH-TO-CONFIG-FILE>');
 ```
 
-to setup the environment for you. To avoid having to do this in each test file you can setup a global include in the mocha section of your package.json as demonstrated in [`/testProject/package.json`](./testProject/package.json). Be sure to change the path to match where you put your include file.
+to setup the environment for you. To avoid having to do this in each test file you can setup a global include in the mocha section of your package.json that requires an include file like [`/testProject/automatedTests/include.ts`](./testProject/automatedTests/include.ts). Be sure to change the path to match where you put your include file.
 
 If you're going to use the `OnDeviceComponent` then there are a number of files that need to be copied over into your app. If you're not using the [BrightScript Extension for VSCode](https://marketplace.visualstudio.com/items?itemName=celsoaf.brightscript) yet then now is a great time to try it out. If you are all you need to is add:
 
@@ -159,9 +159,9 @@ RTA contains most of the standard ECP commands including:
 - Getting the current active app
 - Getting the media player
 
-In addition, with the recent requirement for login and logout scripts, the following methods have been added:  
-`startRaspFileCreation`  
-`finishRaspFileCreation`  
+In addition, with the recent requirement for login and logout scripts, the following methods have been added:
+`startRaspFileCreation`
+`finishRaspFileCreation`
 and a copy of [`utils.sleep`](#sleep) that also includes a pause in your rasp file.
 
 #### Key ECP Methods

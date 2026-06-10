@@ -6,7 +6,7 @@ import * as dotenv from 'dotenv';
 import { utils } from '../utils';
 import { RokuDevice } from '../RokuDevice';
 
-const repoRootDir = path.resolve(__dirname, '../../../');
+const repoRootDir = path.resolve(__dirname, '../../');
 
 export function setupTestEnvironment() {
 	//load environment variables from a .env file at the root of the repo

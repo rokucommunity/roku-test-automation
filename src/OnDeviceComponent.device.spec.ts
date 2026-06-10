@@ -18,7 +18,7 @@ describe('OnDeviceComponent', function () {
 	before(async () => {
 		setupTestEnvironment();
 		await device.deploy({
-			rootDir: '../testProject',
+			rootDir: 'testProject',
 			preventMultipleDeployments: true
 		});
 	});
