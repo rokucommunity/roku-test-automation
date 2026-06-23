@@ -1,4 +1,25 @@
 # Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+
+
+## [3.0.0-alpha.0](https://github.com/rokucommunity/roku-test-automation/compare/2.2.2...v3.0.0-alpha.0) - 2026-06-23
+### Added
+ - Add CHANGELOG for 2.x releases ([#166](https://github.com/rokucommunity/roku-test-automation/pull/166))
+ - Add CI and release workflows, enable device testing and build/lint/test checks in CI ([#159](https://github.com/rokucommunity/roku-test-automation/pull/159))
+ - added [roku-deploy@3.17.6](https://github.com/rokucommunity/roku-deploy)
+ - added [@rokucommunity/bslint@0.8.44](https://github.com/rokucommunity/bslint)
+ - added [brighterscript@0.72.5](https://github.com/rokucommunity/brighterscript)
+### Changed
+ - Security enhancements ([#168](https://github.com/rokucommunity/roku-test-automation/pull/168))
+ - Project restructure ([#165](https://github.com/rokucommunity/roku-test-automation/pull/165))
+ - Code changes for v3.0.0 ([#160](https://github.com/rokucommunity/roku-test-automation/pull/160))
+### Removed
+ - Remove appUI base now that we can get proper key paths during initial app-ui retrieval ([#156](https://github.com/rokucommunity/roku-test-automation/pull/156))
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
