@@ -17,5 +17,8 @@
   "compileOnSave": true,
   "include": [
     "src/**/*.ts"
-  ]
+  ],
+  "ts-node": {
+    "transpileOnly": true
+  }
 }
