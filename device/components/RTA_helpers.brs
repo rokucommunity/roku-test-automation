@@ -89,7 +89,7 @@ end function
 ' * @return {Boolean} Results of the check
 ' */
 function RTA_isInteger(value as Dynamic) as Boolean
-	valueType = type(value)
+	valueType = type(value, 3)
 	return (valueType = "Integer") OR (valueType = "roInt") OR (valueType = "roInteger") OR (valueType = "LongInteger")
 end function
 
@@ -99,7 +99,7 @@ end function
 ' * @return {Boolean} Results of the check
 ' */
 function RTA_isFloat(value as Dynamic) as Boolean
-	valueType = type(value)
+	valueType = type(value, 3)
 	return (valueType = "Float") OR (valueType = "roFloat")
 end function
 
@@ -109,7 +109,7 @@ end function
 ' * @return {Boolean} Results of the check
 ' */
 function RTA_isDouble(value as Dynamic) as Boolean
-	valueType = type(value)
+	valueType = type(value, 3)
 	return (valueType = "Double") OR (valueType = "roDouble") OR (valueType = "roIntrinsicDouble")
 end function
 
@@ -131,7 +131,7 @@ end function
 ' * @return {Boolean} Results of the check
 ' */
 function RTA_isString(value as Dynamic) as Boolean
-	valueType = type(value)
+	valueType = type(value, 3)
 	return (valueType = "String") OR (valueType = "roString")
 end function
 
@@ -205,7 +205,7 @@ end function
 ' * @return {Boolean} Results of the check
 ' */
 function RTA_isBoolean(value as Dynamic) as Boolean
-	valueType = type(value)
+	valueType = type(value, 3)
 	return (valueType = "Boolean") OR (valueType = "roBoolean")
 end function
 
