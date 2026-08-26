@@ -4,8 +4,7 @@ import type * as Mocha from 'mocha';
 import * as Ajv from 'ajv';
 const ajv = new Ajv();
 
-import { isRceDeviceConfig, isRceDeviceConfigById, isRceDeviceConfigByUrl } from 'roku-deploy';
-import type { DeviceConfig } from 'roku-deploy';
+import type { DeviceConfig, LocalDeviceConfig, RceDeviceConfig, RceDeviceConfigByEsn, RceDeviceConfigById, RceDeviceConfigByUrl } from 'roku-deploy';
 import type { ConfigOptions, DeviceConfigOptions } from './types/ConfigOptions';
 import type { BoundingRect } from './types/OnDeviceComponent';
 import type { AppUIResponse, AppUIResponseChild } from './types/AppUIResponse';
@@ -214,13 +213,31 @@ class Utils {
 		if (!device) {
 			return undefined;
 		}
-		if (isRceDeviceConfig(device)) {
-			if (isRceDeviceConfigByUrl(device)) {
+		if (this.isRceDeviceConfig(device)) {
+			if (this.isRceDeviceConfigByUrl(device)) {
 				return device.instanceUrl;
 			}
-			return isRceDeviceConfigById(device) ? String(device.id) : device.esn;
+			return this.isRceDeviceConfigById(device) ? String(device.id) : device.esn;
 		}
 		return device.host;
+	}
+
+	//local copies of roku-deploy's device-config guards; a value import of roku-deploy would pull node-only modules into browser bundles of this file
+	private isRceDeviceConfig(device: DeviceConfigLike): device is RceDeviceConfig {
+		return this.isRceDeviceConfigByEsn(device) || this.isRceDeviceConfigById(device) || this.isRceDeviceConfigByUrl(device);
+	}
+
+	private isRceDeviceConfigByEsn(device: DeviceConfigLike): device is RceDeviceConfigByEsn {
+		return !!device.esn;
+	}
+
+	private isRceDeviceConfigById(device: DeviceConfigLike): device is RceDeviceConfigById {
+		//0 is a valid id so an explicit undefined check
+		return device.id !== undefined;
+	}
+
+	private isRceDeviceConfigByUrl(device: DeviceConfigLike): device is RceDeviceConfigByUrl {
+		return !!device.instanceUrl;
 	}
 
 	public getTestTitlePath(contextOrSuite: Mocha.Context | Mocha.Suite, sanitize = true) {
@@ -385,3 +402,6 @@ class Utils {
 
 const utils = new Utils();
 export { utils };
+
+//any object that may carry device identifier keys, so the guards work on partially-populated shapes
+type DeviceConfigLike = Partial<LocalDeviceConfig & RceDeviceConfigByEsn & RceDeviceConfigById & RceDeviceConfigByUrl>;
