@@ -23,7 +23,14 @@ export function setupTestEnvironment() {
 
 	const configFilePath = path.resolve(repoRootDir, 'testProject/rta-config.json');
 	const config = utils['getConfigFromConfigFileCore'](configFilePath);
-	if (process.env.ROKU_HOST && process.env.ROKU_PASSWORD) {
+	if (process.env.ROKU_RCE_DEVICE_ID && process.env.ROKU_RCE_TOKEN && process.env.ROKU_RCE_PASSWORD) {
+		//target a Roku Cloud Emulator device instead of a local one
+		config.RokuDevice.devices = [{
+			id: Number(process.env.ROKU_RCE_DEVICE_ID),
+			rceToken: process.env.ROKU_RCE_TOKEN,
+			password: process.env.ROKU_RCE_PASSWORD
+		}];
+	} else if (process.env.ROKU_HOST && process.env.ROKU_PASSWORD) {
 		if (config.RokuDevice?.devices) {
 			config.RokuDevice.devices.map(x => {
 				//override the host and password with environment variables so CI/CD unit tests actually work
@@ -33,11 +40,11 @@ export function setupTestEnvironment() {
 			});
 		}
 	}
-	//if we don't have a host or password, fail here so our tests have better error messages
+	//if we don't have a device address or password, fail here so our tests have better error messages
 	const devices = config.RokuDevice?.devices ?? [];
-	if (devices.length === 0 || devices.some(x => !x.host || !x.password)) {
+	if (devices.length === 0 || devices.some(x => (!x.host && x.id === undefined && !x.esn && !x.instanceUrl) || !x.password)) {
 		throw new Error(
-			`Missing Roku device host and/or password. Set ROKU_HOST and ROKU_PASSWORD in "${path.join(repoRootDir, '.env')}" or update the host & password in "${configFilePath}".`
+			`Missing Roku device address and/or password. Set ROKU_HOST and ROKU_PASSWORD (or ROKU_RCE_DEVICE_ID, ROKU_RCE_TOKEN, and ROKU_RCE_PASSWORD for a cloud emulator device) in "${path.join(repoRootDir, '.env')}" or update the host & password in "${configFilePath}".`
 		);
 	}
 	utils.setupEnvironmentFromConfig(config);
