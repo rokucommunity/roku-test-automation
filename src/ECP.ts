@@ -121,11 +121,9 @@ export class ECP {
 				wait = keypressDelay;
 			}
 
-			const encodedKey = encodeURIComponent(key);
-
 			for (let i = 0; i < (pressOptions?.count ?? 1); i++) {
 				if (keydown) {
-					await this.device.sendEcpPost(`keydown/${encodedKey}`);
+					await this.device.sendKeyDown(key);
 				}
 
 				if (duration) {
@@ -133,7 +131,7 @@ export class ECP {
 				}
 
 				if (keyup) {
-					await this.device.sendEcpPost(`keyup/${encodedKey}`);
+					await this.device.sendKeyUp(key);
 				}
 
 				if (wait) await this.utils.sleep(wait);
@@ -177,7 +175,7 @@ export class ECP {
 			this.addRaspFileStep(`press: ${raspEquivalent}`);
 		}
 
-		await this.device.sendEcpPost(`keypress/${encodeURIComponent(key)}`);
+		await this.device.sendKeyPress(key);
 
 		const keypressDelay = this.getConfig()?.default?.keypressDelay;
 		let wait = options?.wait;

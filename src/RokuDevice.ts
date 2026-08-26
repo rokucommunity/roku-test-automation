@@ -151,6 +151,38 @@ export class RokuDevice {
 		return this.sendEcp(path, params, 'GET', options);
 	}
 
+	public sendKeyPress(key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		return this.sendKeyEventToRokuDeploy('keyPress', key, options);
+	}
+
+	public sendKeyDown(key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		return this.sendKeyEventToRokuDeploy('keyDown', key, options);
+	}
+
+	public sendKeyUp(key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		return this.sendKeyEventToRokuDeploy('keyUp', key, options);
+	}
+
+	// roku-deploy sends the key text as-is (no retry, uri-encoding handled internally); RTA just retries here
+	private async sendKeyEventToRokuDeploy(rokuDeployMethod: 'keyPress' | 'keyDown' | 'keyUp', key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		let retryCount = options.retryCount;
+		if (retryCount === undefined) {
+			retryCount = 3;
+		}
+
+		try {
+			return await rokuDeploy[rokuDeployMethod]({ device: this.getRokuDeployDevice(), key });
+		} catch (e) {
+			if ((retryCount - 1) > 0) {
+				this.debugLog(`${rokuDeployMethod} request for key ${key} failed. Retrying.`);
+				// Want to delay retry slightly
+				await utils.sleep(50);
+				return this.sendKeyEventToRokuDeploy(rokuDeployMethod, key, { ...options, retryCount: retryCount - 1 });
+			}
+			throw utils.makeError('sendKeyEventError', `${rokuDeployMethod} request for key ${key} failed and no retries left`);
+		}
+	}
+
 	private async sendEcp(path: string, params = {}, method: 'GET' | 'POST', options: HttpRequestOptions = {}): Promise<EcpResponse> {
 		let route = path;
 		let retryCount = options.retryCount;

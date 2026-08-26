@@ -22,6 +22,9 @@ describe('ECP', function () {
 	let config: ConfigOptions;
 	let sendEcpPostStub: sinon.SinonStub;
 	let sendEcpGetStub: sinon.SinonStub;
+	let sendKeyPressStub: sinon.SinonStub;
+	let sendKeyDownStub: sinon.SinonStub;
+	let sendKeyUpStub: sinon.SinonStub;
 
 	beforeEach(() => {
 		device = new RokuDevice();
@@ -29,6 +32,15 @@ describe('ECP', function () {
 			return ecpResponse;
 		});
 		sendEcpGetStub = sinon.stub(device, 'sendEcpGet').callsFake(() => {
+			return ecpResponse;
+		});
+		sendKeyPressStub = sinon.stub(device, 'sendKeyPress').callsFake(() => {
+			return ecpResponse;
+		});
+		sendKeyDownStub = sinon.stub(device, 'sendKeyDown').callsFake(() => {
+			return ecpResponse;
+		});
+		sendKeyUpStub = sinon.stub(device, 'sendKeyUp').callsFake(() => {
 			return ecpResponse;
 		});
 
@@ -48,12 +60,13 @@ describe('ECP', function () {
 	});
 
 	describe('sendText', function () {
-		it('calls_device_sendEcpPost_for_each_character', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => { }) as any);
-
+		it('calls_device_sendKeyPress_for_each_character', async () => {
 			const text = 'love my life';
 			await ecp.sendText(text);
-			expect(sendEcpPostStub.callCount).to.equal(text.length);
+			expect(sendKeyPressStub.callCount).to.equal(text.length);
+			expect(sendKeyPressStub.getCall(0).args[0]).to.equal('LIT_l');
+			// the seam receives raw keys; encoding is roku-deploy's job, so pre-encoding here would double-encode
+			expect(sendKeyPressStub.getCall(4).args[0]).to.equal('LIT_ ');
 		});
 
 		it('uses_raspTemplateVariable_if_provided_instead_of_text_for_rasp_output', async () => {
@@ -67,52 +80,37 @@ describe('ECP', function () {
 	});
 
 	describe('sendKeypressSequence', function () {
-		it('calls_device_sendEcpPost_for_each_key', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => { }) as any);
-
+		it('calls_device_sendKeyPress_for_each_key', async () => {
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 			await ecp.sendKeypressSequence(keys);
-			expect(sendEcpPostStub.callCount).to.equal(keys.length);
+			expect(sendKeyPressStub.callCount).to.equal(keys.length);
 		});
 
 		it('should send_the_pattern_multiple_times_in_the_correct_order_if_count_is_more_than_one', async () => {
-			let index = 0;
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 			const count = 3;
 
-			sendEcpPostStub.callsFake(((path: string, params?: object) => {
-				expect(path).to.contain(keys[index]);
-				index++;
-				if (index === keys.length) {
-					index = 0;
-				}
-			}) as any);
-
 			await ecp.sendKeypressSequence(keys, { count: count });
-			expect(sendEcpPostStub.callCount).to.equal(keys.length * count);
+			expect(sendKeyPressStub.callCount).to.equal(keys.length * count);
+			for (let i = 0; i < sendKeyPressStub.callCount; i++) {
+				expect(sendKeyPressStub.getCall(i).args[0]).to.equal(keys[i % keys.length]);
+			}
 		});
 
 		it('should_not_send_any_keys_if_count_is_zero', async () => {
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 
-			sendEcpPostStub.callsFake(((path: string, params?: object) => { }) as any);
-
 			await ecp.sendKeypressSequence(keys, { count: 0 });
-			expect(sendEcpPostStub.callCount).to.equal(0);
+			expect(sendKeyPressStub.callCount).to.equal(0);
 		});
 	});
 
 	describe('sendKeypress', function () {
-		it('calls_device_sendEcpPost', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => {
-				expect(path).to.contain(ECP.Key.Home);
-			}) as any);
-
+		it('calls_device_sendKeyPress', async () => {
 			await ecp.sendKeypress(ECP.Key.Home, 0);
 
-			if (sendEcpPostStub.notCalled) {
-				assert.fail('device.sendEcpPost not called');
-			}
+			expect(sendKeyPressStub.callCount).to.equal(1);
+			expect(sendKeyPressStub.getCall(0).args[0]).to.equal(ECP.Key.Home);
 		});
 
 		it('does_not_sleep_if_not_requested', async () => {
@@ -179,73 +177,54 @@ describe('ECP', function () {
 
 	describe('sendKeyDown', function () {
 		it('sends_key_down_event', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => {
-				expect(path).to.contain(ECP.Key.Play);
-			}) as any);
-
 			await ecp.sendKeyDown(ECP.Key.Play);
 
-			expect(sendEcpPostStub.callCount).equals(1);
-			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keydown/Play');
+			expect(sendKeyDownStub.callCount).equals(1);
+			expect(sendKeyDownStub.getCall(0).args[0]).to.equal(ECP.Key.Play);
 		});
 
 		it('sends_multiple_key_events', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => {
-				expect(path).to.contain(ECP.Key.Play);
-			}) as any);
-
 			await ecp.sendKeyDown(ECP.Key.Play, 0, { count: 3 });
 
-			expect(sendEcpPostStub.callCount).equals(3);
-			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keydown/Play');
-			expect(sendEcpPostStub.getCall(1).lastArg).to.include('keydown/Play');
-			expect(sendEcpPostStub.getCall(2).lastArg).to.include('keydown/Play');
+			expect(sendKeyDownStub.callCount).equals(3);
+			expect(sendKeyDownStub.getCall(0).args[0]).to.equal(ECP.Key.Play);
+			expect(sendKeyDownStub.getCall(1).args[0]).to.equal(ECP.Key.Play);
+			expect(sendKeyDownStub.getCall(2).args[0]).to.equal(ECP.Key.Play);
 		});
 	});
 
 	describe('sendKeyUp', function () {
 		it('sends_key_up_event', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => {
-				expect(path).to.contain(ECP.Key.Play);
-			}) as any);
-
 			await ecp.sendKeyUp(ECP.Key.Play);
 
-			expect(sendEcpPostStub.callCount).equals(1);
-			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keyup/Play');
+			expect(sendKeyUpStub.callCount).equals(1);
+			expect(sendKeyUpStub.getCall(0).args[0]).to.equal(ECP.Key.Play);
 		});
 	});
 
 	describe('sendKeyPressAndHold', function () {
 		it('sends_long_key_press', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => {
-				expect(path).to.contain(ECP.Key.Play);
-			}) as any);
-
 			sinon.stub(ecpUtils, 'sleep').callsFake(((milliseconds: number) => {
 				expect(milliseconds).to.greaterThan(0);
 			}) as any);
 
 			await ecp.sendKeyPressAndHold(ECP.Key.Play, 500);
 
-			expect(sendEcpPostStub.callCount).equals(2);
-			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keydown/Play');
-			expect(sendEcpPostStub.getCall(1).lastArg).to.include('keyup/Play');
+			expect(sendKeyDownStub.callCount).equals(1);
+			expect(sendKeyDownStub.getCall(0).args[0]).to.equal(ECP.Key.Play);
+			expect(sendKeyUpStub.callCount).equals(1);
+			expect(sendKeyUpStub.getCall(0).args[0]).to.equal(ECP.Key.Play);
 		});
 	});
 
 	describe('sendKeyEvent', function () {
 		it('sends_regular_key_press_when_press_and_hold_has_no_duration', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object) => {
-				expect(path).to.contain(ECP.Key.Play);
-			}) as any);
-
 			await ecp.sendKeyEvent(ECP.Key.Play, 0);
 			await ecp.sendKeyEvent(ECP.Key.Play, { keydown: true, keyup: true, duration: 0 });
 
-			expect(sendEcpPostStub.callCount).equals(2);
-			expect(sendEcpPostStub.getCall(0).lastArg).to.include('keypress/Play');
-			expect(sendEcpPostStub.getCall(1).lastArg).to.include('keypress/Play');
+			expect(sendKeyPressStub.callCount).equals(2);
+			expect(sendKeyPressStub.getCall(0).args[0]).to.equal(ECP.Key.Play);
+			expect(sendKeyPressStub.getCall(1).args[0]).to.equal(ECP.Key.Play);
 		});
 	});
 
