@@ -1,0 +1,1 @@
+<player error="false" state="startup"><plugin bandwidth="19111730 bps" id="dev" name="App name"></plugin><buffering current="0" max="1000" target="1000"></buffering><new_stream speed="128000 bps"></new_stream><duration>8551626 ms</duration><is_live>false</is_live></player>

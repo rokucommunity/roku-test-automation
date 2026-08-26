@@ -1,12 +1,11 @@
-import * as needle from 'needle';
 import { rokuDeploy, DefaultFiles, createRokuDeploySocket } from 'roku-deploy';
-import type { DeviceConfig, RokuDeployOptions } from 'roku-deploy';
+import type { DeviceConfig, EcpResult, RokuDeployOptions } from 'roku-deploy';
 import * as fsExtra from 'fs-extra';
-import * as querystring from 'needle/lib/querystring';
-import type * as mocha from 'mocha';
-
+import * as querystring from 'querystring';
 import type { ConfigOptions } from './types/ConfigOptions';
 import { utils } from './utils';
+import type * as mocha from 'mocha';
+import { parseEcpResponse } from './EcpXml';
 
 export interface HttpRequestOptions {
 	/** How many times to retry the request before throwing an error. Defaults to 3 if not specified */
@@ -16,7 +15,6 @@ export interface HttpRequestOptions {
 export class RokuDevice {
 	public deployed = false;
 	private config?: ConfigOptions;
-	private needle = needle;
 
 	constructor(config?: ConfigOptions) {
 		if (config) {
@@ -145,40 +143,46 @@ export class RokuDevice {
 		return updatedContents;
 	}
 
-	public sendEcpPost(path: string, params = {}, body: needle.BodyData = '', options: HttpRequestOptions = {}): Promise<needle.NeedleResponse> {
-		return this.sendEcp(path, params, body, options);
+	public sendEcpPost(path: string, params = {}, options: HttpRequestOptions = {}): Promise<EcpResponse> {
+		return this.sendEcp(path, params, 'POST', options);
 	}
 
-	public sendEcpGet(path: string, params = {}, options: HttpRequestOptions = {}): Promise<needle.NeedleResponse> {
-		return this.sendEcp(path, params, undefined, options);
+	public sendEcpGet(path: string, params = {}, options: HttpRequestOptions = {}): Promise<EcpResponse> {
+		return this.sendEcp(path, params, 'GET', options);
 	}
 
-	private async sendEcp(path: string, params = {}, body?: needle.BodyData, options: HttpRequestOptions = {}): Promise<needle.NeedleResponse> {
-		let url = `http://${this.getCurrentDeviceConfig().host}:8060/${path}`;
+	private async sendEcp(path: string, params = {}, method: 'GET' | 'POST', options: HttpRequestOptions = {}): Promise<EcpResponse> {
+		const result = await this.sendEcpRaw(path, params, method, options);
+		//parse outside the retry so a malformed response body does not trigger transport retries
+		return {
+			status: result.status,
+			headers: result.headers,
+			body: parseEcpResponse(result)
+		};
+	}
+
+	private async sendEcpRaw(path: string, params = {}, method: 'GET' | 'POST', options: HttpRequestOptions = {}): Promise<EcpResult> {
+		let route = path;
 		let retryCount = options.retryCount;
 		if (retryCount === undefined) {
 			retryCount = 3;
 		}
 
 		if (params && Object.keys(params).length) {
-			url = url.replace(/\?.*|$/, '?' + querystring.build(params));
+			route = `${path}?${querystring.stringify(params)}`;
 		}
 
 		try {
-			if (body !== undefined) {
-				return await this.needle('post', url, body, this.getNeedleOptions());
-			} else {
-				return await this.needle('get', url, this.getNeedleOptions());
-			}
+			return await rokuDeploy.sendEcpRequest(this.getRokuDeployDevice(), route, { method: method });
 		} catch (e) {
 			if ((retryCount - 1) > 0) {
-				this.debugLog(`ECP request to ${url} failed. Retrying.`);
+				this.debugLog(`ECP request to ${route} failed. Retrying.`);
 				// Want to delay retry slightly
 				await utils.sleep(50);
-				return this.sendEcp(path, params, body, {...options, retryCount: retryCount - 1});
+				return this.sendEcpRaw(path, params, method, {...options, retryCount: retryCount - 1});
 			}
 		}
-		throw utils.makeError('sendEcpError', `ECP request to ${url} failed and no retries left`);
+		throw utils.makeError('sendEcpError', `ECP request to ${route} failed and no retries left`);
 	}
 
 	/**
@@ -253,17 +257,20 @@ export class RokuDevice {
 		return `Telnet output from ${utils.getDeviceLabel(this.getRokuDeployDevice())}\n` + splitContents.join('\n');
 	}
 
-	private getNeedleOptions() {
-		const options: needle.NeedleOptions = {};
-		options.proxy = this.getConfig().proxy;
-		return options;
-	}
-
 	private debugLog(message: string, ...args) {
 		if (this.getConfig()?.clientDebugLogging) {
 			console.log(`[RokuDevice] ${message}`, ...args);
 		}
 	}
+}
+
+export interface EcpResponse {
+	/** The http status code of the response, or undefined when the transport produced no response */
+	status: number | undefined;
+	/** The response headers (lowercased names) */
+	headers: Record<string, string | string[]>;
+	/** The response body, parsed by content-type: an element tree for xml, an object for json, otherwise the raw string */
+	body: any;
 }
 
 export interface BeforeZipCallbackInfo {

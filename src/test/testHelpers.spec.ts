@@ -1,5 +1,6 @@
 import * as fsExtra from 'fs-extra';
-import type * as needle from 'needle';
+import type { EcpResponse } from '../RokuDevice';
+import { parseEcpResponse } from '../EcpXml';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
@@ -77,11 +78,11 @@ export async function getTestMock(contextOrSuiteOrString: Mocha.Context | Mocha.
 	}
 }
 
-export async function getNeedleMockResponse(contextOrSuiteOrString: Mocha.Context | Mocha.Suite | string, extension: MockFileFormat = 'json'): Promise<needle.NeedleResponse> {
-	const mock: any = {
-		body: await getTestMock(contextOrSuiteOrString, extension)
-	};
-	return mock;
+export async function getEcpMockResponse(contextOrSuiteOrString: Mocha.Context | Mocha.Suite | string, status = 200): Promise<EcpResponse> {
+	const xml = await getTestMock(contextOrSuiteOrString, 'xml') as string;
+	const headers = { 'content-type': 'text/xml; charset="utf-8"' };
+	//run the real parser over the xml fixture so specs exercise it and consumers get the parsed body shape
+	return { status: status, headers: headers, body: parseEcpResponse({ status: status, body: xml, headers: headers }) };
 }
 
 declare type MockFileFormat = 'json' | 'xml';

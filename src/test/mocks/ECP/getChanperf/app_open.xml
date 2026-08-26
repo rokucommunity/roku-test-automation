@@ -1,0 +1,1 @@
+<chanperf><timestamp>1669155295858</timestamp><plugin><cpu-percent><duration-seconds>1.000000</duration-seconds><user>0.2</user><sys>0.2</sys></cpu-percent><memory><used>117075968</used><res>116690944</res><anon>91312128</anon><swap>385024</swap><file>25042944</file><shared>335872</shared></memory><id>dev</id></plugin><status>OK</status></chanperf>

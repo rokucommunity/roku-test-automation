@@ -41,8 +41,8 @@
         "needle": "^2.9.1",
         "path": "^0.12.7",
         "portfinder": "^1.0.33",
-        "postman-request": "^2.88.1-postman.48",
         "roku-deploy": "^4.0.0-alpha.3",
+        "sax": "^1.6.1",
         "stoppable": "^1.1.0"
     },
     "devDependencies": {
@@ -50,9 +50,10 @@
         "@types/chai": "^4.3.0",
         "@types/chai-arrays": "^2.0.0",
         "@types/fs-extra": "^5.0.1",
-        "@types/mocha": "^8.2.3",
+        "@types/mocha": "^10.0.10",
         "@types/needle": "^2.5.2",
         "@types/node": "^13.13.52",
+        "@types/sax": "^1.2.7",
         "@types/sinon": "^7.5.2",
         "@types/xmljs": "^0.3.2",
         "@typescript-eslint/eslint-plugin": "^5.22.0",

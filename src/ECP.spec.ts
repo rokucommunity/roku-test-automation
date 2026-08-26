@@ -1,4 +1,3 @@
-import type * as needle from 'needle';
 import * as fsExtra from 'fs-extra';
 import * as assert from 'assert';
 import * as chai from 'chai';
@@ -50,7 +49,7 @@ describe('ECP', function () {
 
 	describe('sendText', function () {
 		it('calls_device_sendEcpPost_for_each_character', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
+			sendEcpPostStub.callsFake(((path: string, params?: object) => { }) as any);
 
 			const text = 'love my life';
 			await ecp.sendText(text);
@@ -69,7 +68,7 @@ describe('ECP', function () {
 
 	describe('sendKeypressSequence', function () {
 		it('calls_device_sendEcpPost_for_each_key', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
+			sendEcpPostStub.callsFake(((path: string, params?: object) => { }) as any);
 
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 			await ecp.sendKeypressSequence(keys);
@@ -81,7 +80,7 @@ describe('ECP', function () {
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 			const count = 3;
 
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object) => {
 				expect(path).to.contain(keys[index]);
 				index++;
 				if (index === keys.length) {
@@ -96,7 +95,7 @@ describe('ECP', function () {
 		it('should_not_send_any_keys_if_count_is_zero', async () => {
 			const keys = [ECP.Key.Forward, ECP.Key.Play, ECP.Key.Rewind];
 
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => { }) as any);
+			sendEcpPostStub.callsFake(((path: string, params?: object) => { }) as any);
 
 			await ecp.sendKeypressSequence(keys, { count: 0 });
 			expect(sendEcpPostStub.callCount).to.equal(0);
@@ -105,7 +104,7 @@ describe('ECP', function () {
 
 	describe('sendKeypress', function () {
 		it('calls_device_sendEcpPost', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object) => {
 				expect(path).to.contain(ECP.Key.Home);
 			}) as any);
 
@@ -180,7 +179,7 @@ describe('ECP', function () {
 
 	describe('sendKeyDown', function () {
 		it('sends_key_down_event', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
@@ -191,7 +190,7 @@ describe('ECP', function () {
 		});
 
 		it('sends_multiple_key_events', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
@@ -206,7 +205,7 @@ describe('ECP', function () {
 
 	describe('sendKeyUp', function () {
 		it('sends_key_up_event', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
@@ -219,7 +218,7 @@ describe('ECP', function () {
 
 	describe('sendKeyPressAndHold', function () {
 		it('sends_long_key_press', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
@@ -237,7 +236,7 @@ describe('ECP', function () {
 
 	describe('sendKeyEvent', function () {
 		it('sends_regular_key_press_when_press_and_hold_has_no_duration', async () => {
-			sendEcpPostStub.callsFake(((path: string, params?: object, body?: needle.BodyData) => {
+			sendEcpPostStub.callsFake(((path: string, params?: object) => {
 				expect(path).to.contain(ECP.Key.Play);
 			}) as any);
 
@@ -252,7 +251,7 @@ describe('ECP', function () {
 
 	describe('getActiveApp', function () {
 		it('app_active', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getActiveApp();
 			expect(result.app?.id).to.equal('dev');
 			expect(result.app?.title).to.equal('mockAppTitle');
@@ -261,14 +260,14 @@ describe('ECP', function () {
 		});
 
 		it('no_app_or_screensaver_active', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getActiveApp();
 			expect(result.app?.id).to.not.be.ok;
 			expect(result.app?.title).to.equal('Roku');
 		});
 
 		it('screensaver_active_app_open', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getActiveApp();
 			expect(result.app?.id).to.equal('dev');
 			expect(result.app?.title).to.equal('mockAppTitle');
@@ -282,7 +281,7 @@ describe('ECP', function () {
 		});
 
 		it('screensaver_active_no_app_open', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getActiveApp();
 			expect(result.screensaver?.id).to.equal('261525');
 			expect(result.screensaver?.title).to.equal('Aquatic Life');
@@ -296,7 +295,7 @@ describe('ECP', function () {
 
 	describe('sendLaunchChannel', function () {
 		it('should_not_throw_if_successful_and_verification_is_enabled', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			await ecp.sendLaunchChannel({
 				channelId: 'dev',
 				params: {},
@@ -359,7 +358,7 @@ describe('ECP', function () {
 
 	describe('getMediaPlayer', function () {
 		it('app_closed', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getMediaPlayer();
 			expect(result.state).to.equal('close');
 			expect(result.error).to.equal(false);
@@ -367,7 +366,7 @@ describe('ECP', function () {
 		});
 
 		it('player_closed', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getMediaPlayer();
 
 			expect(result.state).to.equal('close');
@@ -379,7 +378,7 @@ describe('ECP', function () {
 		});
 
 		it('player_startup', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getMediaPlayer();
 
 			expect(result.state).to.equal('startup');
@@ -401,7 +400,7 @@ describe('ECP', function () {
 		});
 
 		it('player_buffering', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getMediaPlayer();
 
 			expect(result.state).to.equal('buffer');
@@ -423,7 +422,7 @@ describe('ECP', function () {
 		});
 
 		it('player_playing', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getMediaPlayer();
 
 			expect(result.state).to.equal('play');
@@ -451,7 +450,7 @@ describe('ECP', function () {
 		});
 
 		it('player_paused', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getMediaPlayer();
 
 			expect(result.state).to.equal('pause');
@@ -481,7 +480,7 @@ describe('ECP', function () {
 
 	describe('getChanperf', function () {
 		it('app_closed', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getChanperf();
 			expect(result.error).to.equal('Channel not running');
 			expect(result.status).to.equal('FAILED');
@@ -489,7 +488,7 @@ describe('ECP', function () {
 		});
 
 		it('app_open', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse(this);
+			ecpResponse = await testUtils.getEcpMockResponse(this);
 			const result = await ecp.getChanperf();
 			expect(result.status).to.equal('OK');
 			expect(result.plugin?.id).to.equal('dev');
@@ -565,7 +564,7 @@ steps:
 		let mockOdc: any;
 
 		beforeEach(async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse('ECP/getAppUI/appUIResponseWithGaps');
+			ecpResponse = await testUtils.getEcpMockResponse('ECP/getAppUI/appUIResponseWithGaps');
 			mockOdc = {
 				assignElementIdOnAllNodes: sinon.stub().resolves({}),
 				getChildrenByElementId: sinon.stub().resolves({
@@ -699,7 +698,7 @@ steps:
 		});
 
 		it('should always include scene as a gap parent even when totalChildren matches', async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse('ECP/getAppUI/appUIResponseNoGaps');
+			ecpResponse = await testUtils.getEcpMockResponse('ECP/getAppUI/appUIResponseNoGaps');
 			mockOdc.getChildrenByElementId.resolves({
 				results: {
 					'RTA_1': [
@@ -761,7 +760,7 @@ steps:
 		let mockOdc: any;
 
 		beforeEach(async () => {
-			ecpResponse = await testUtils.getNeedleMockResponse('ECP/getAppUI/appUIResponse');
+			ecpResponse = await testUtils.getEcpMockResponse('ECP/getAppUI/appUIResponse');
 			mockOdc = {
 				assignElementIdOnAllNodes: sinon.stub().resolves({}),
 				getChildrenByElementId: sinon.stub().resolves({ results: {}, timeTaken: 0 })

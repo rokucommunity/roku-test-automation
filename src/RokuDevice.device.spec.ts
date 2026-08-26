@@ -4,7 +4,8 @@ import * as sinonImport from 'sinon';
 import * as fsExtra from 'fs-extra';
 const sinon = sinonImport.createSandbox();
 const expect = chai.expect;
-import * as querystring from 'needle/lib/querystring';
+import * as querystring from 'querystring';
+import { rokuDeploy } from 'roku-deploy';
 import { ecp, device } from './';
 import { setupTestEnvironment } from './test/testHelpers.spec';
 
@@ -24,8 +25,9 @@ describe('RokuDevice', function () {
 		});
 
 		it('should work if params are passed in', async () => {
-			sinon.stub((device as any), 'needle').callsFake((method, url, data, options?) => {
-				expect(url).to.contain(querystring.build(params));
+			sinon.stub(rokuDeploy, 'sendEcpRequest').callsFake((deviceConfig, route) => {
+				expect(route).to.contain(querystring.stringify(params));
+				return Promise.resolve({ status: 200, body: '', headers: {} });
 			});
 
 			const params = {
@@ -36,7 +38,7 @@ describe('RokuDevice', function () {
 		});
 
 		it('should retry the specified number of times requested', async () => {
-			const stub = sinon.stub((device as any), 'needle').callsFake((method, url, data, options?) => {
+			const stub = sinon.stub(rokuDeploy, 'sendEcpRequest').callsFake(() => {
 				throw new Error('Socket hang up');
 			});
 
@@ -47,7 +49,7 @@ describe('RokuDevice', function () {
 
 			const retryCount = 5;
 			try {
-				await device.sendEcpPost('launch/dev', params, undefined, {
+				await device.sendEcpPost('launch/dev', params, {
 					retryCount: retryCount
 				});
 			} catch(e) {
