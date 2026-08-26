@@ -14,6 +14,9 @@ export interface ConfigOptions {
 	OnDeviceComponent?: OnDeviceComponentConfigOptions;
 
 	NetworkProxy?: NetworkProxyOptions;
+
+	/** Shared Roku Cloud Emulator api token applied to any device entry that doesn't define its own. The `ROKU_RCE_TOKEN` environment variable is the final fallback. */
+	rceToken?: string;
 }
 
 export interface RokuDeviceConfigOptions {
@@ -45,7 +48,7 @@ export interface DeviceConfigOptions {
 	/** Roku Cloud Emulator instance url, to address a running instance directly */
 	instanceUrl?: string;
 
-	/** Bearer token used to authenticate Roku Cloud Emulator requests */
+	/** Bearer token used to authenticate Roku Cloud Emulator requests. Overrides the root-level `rceToken` and the `ROKU_RCE_TOKEN` environment variable */
 	rceToken?: string;
 
 	/** The password for logging in to the developer portal on the target Roku device */

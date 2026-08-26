@@ -163,7 +163,7 @@
                                 "type": "object"
                             },
                             "rceToken": {
-                                "description": "Bearer token used to authenticate Roku Cloud Emulator requests",
+                                "description": "Bearer token used to authenticate Roku Cloud Emulator requests. Overrides the root-level `rceToken` and the `ROKU_RCE_TOKEN` environment variable",
                                 "type": "string"
                             },
                             "screenshotFormat": {
@@ -198,6 +198,10 @@
         },
         "extends": {
             "description": "Allows this config to extend another rta-config.json file",
+            "type": "string"
+        },
+        "rceToken": {
+            "description": "Shared Roku Cloud Emulator api token applied to any device entry that doesn't define its own. The `ROKU_RCE_TOKEN` environment variable is the final fallback.",
             "type": "string"
         }
     },
