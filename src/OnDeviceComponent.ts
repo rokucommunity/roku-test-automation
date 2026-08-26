@@ -692,136 +692,141 @@ export class OnDeviceComponent {
 			return this.clientSocketPromise;
 		}
 
-		this.clientSocketPromise = new Promise<RokuDeploySocket>((resolve, reject) => {
+		const clientSocketPromise = new Promise<RokuDeploySocket>((resolve, reject) => {
 			//TESTING: was 9000; RCE instances only proxy whitelisted ports plus the ephemeral range 49152-65535, and 9000 is not proxied. Must match RTA_OnDeviceComponentTask.brs
 			const port = 50000;
 			const rokuDeployDevice = this.device.getRokuDeployDevice();
 			const deviceLabel = utils.getDeviceLabel(rokuDeployDevice);
 			const timeout = this.getTimeOut(options);
 			const startTime = Date.now();
-			const socket = createRokuDeploySocket({ device: rokuDeployDevice, port: port });
 
-			const socketConnect = () => {
+			// Each retry attempt needs its own socket instance (RokuDeploySocket throws if connect() is called twice), so this wires up a fresh socket and its listeners per attempt.
+			const connectWithFreshSocket = () => {
+				const socket = createRokuDeploySocket({ device: rokuDeployDevice, port: port });
+
+				socket.on('connect', () => {
+					this.debugLog(`Connected to Roku at ${deviceLabel} on port ${port}`);
+					this.setSettings({
+						logLevel: this.getConfig()?.logLevel ?? 'info'
+					}, {
+						socket: socket
+					}).then(() => {
+						resolve(socket);
+					}, (e) => {
+						this.debugLog('Could not set settings', e);
+					});
+				});
+
+				socket.on('error', async (e) => {
+					const errorCode: string = (e as any).code;
+					if (errorCode === 'ECONNREFUSED' || errorCode === 'EPIPE') {
+						if (Date.now() - startTime > timeout) {
+							const error = new Error(`Failed to connect to Roku at ${deviceLabel} on port ${port}. Make sure you have the on device component running on your Roku.`);
+							reject(error);
+							return;
+						}
+
+						this.clientSocket = undefined;
+						await utils.sleep(1000);
+						this.debugLog('Retrying connection due to: ' + errorCode);
+						connectWithFreshSocket();
+					} else {
+						if (errorCode === 'ETIMEDOUT') {
+							this.debugLog(`Failed to connect to Roku at ${deviceLabel} on port ${port}`);
+						}
+						reject(e);
+					}
+				});
+
+				socket.on('timeout', () => {
+					console.log('socket time out');
+				});
+
+				socket.on('drop', () => {
+					console.log('socket drop');
+				});
+
+				socket.on('close', () => {
+					this.clientSocket = undefined;
+				});
+
+				socket.on('data', (data) => {
+					let offset = 0;
+					while (offset < data.length) {
+						if (!this.receivingRequestResponse) {
+							this.receivingRequestResponse = {
+								json: {},
+								stringLength: data.readInt32LE(0 + offset),
+								binaryLength: data.readInt32LE(4 + offset),
+								stringPayload: '',
+								binaryPayload: Buffer.alloc(0)
+							};
+							offset += this.requestHeaderSize;
+						}
+
+						// Check if we're still receiving the string payload
+						const remainingStringPayload = this.receivingRequestResponse.stringLength - this.receivingRequestResponse.stringPayload.length;
+						if (remainingStringPayload > 0) {
+							const remainingBufferBytes = data.length - offset;
+							if (remainingBufferBytes < remainingStringPayload) {
+								this.receivingRequestResponse.stringPayload += data.toString('utf-8', offset, remainingBufferBytes + offset);
+								return;
+							} else {
+								this.receivingRequestResponse.stringPayload += data.toString('utf-8', offset, remainingStringPayload + offset);
+								offset += remainingStringPayload;
+							}
+						}
+
+						const binaryPayload = this.receivingRequestResponse.binaryPayload;
+						const remainingBinaryPayload = this.receivingRequestResponse.binaryLength - binaryPayload.length;
+						if (remainingBinaryPayload > 0) {
+							const remainingBufferBytes = data.length - offset;
+							if (remainingBufferBytes < remainingBinaryPayload) {
+								const additionalBinaryPayload = data.slice(offset, remainingBufferBytes + offset);
+								this.receivingRequestResponse.binaryPayload = Buffer.concat([binaryPayload, additionalBinaryPayload]);
+								return;
+							} else {
+								const additionalBinaryPayload = data.slice(offset, remainingBinaryPayload + offset);
+								this.receivingRequestResponse.binaryPayload = Buffer.concat([binaryPayload, additionalBinaryPayload]);
+								offset += remainingBinaryPayload;
+							}
+						}
+
+						const receivingRequestResponse = this.receivingRequestResponse;
+						this.receivingRequestResponse = undefined;
+						const json = JSON.parse(receivingRequestResponse.stringPayload);
+
+						receivingRequestResponse.json = json;
+						if (json.id && this.activeRequests[json.id]) {
+							const request = this.activeRequests[json.id];
+
+							if (!request.callback) {
+								// Should never happen as we should always have a callback but just in case
+								console.error('Request did not have callback');
+							} else {
+								request.callback(receivingRequestResponse);
+							}
+						} else {
+							this.debugLog('Received response for unknown request:', json);
+						}
+					}
+				});
+
 				this.debugLog(`Attempting to connect to Roku at ${deviceLabel} on port ${port}`);
 				socket.connect();
 			};
 
-			socket.on('connect', () => {
-				this.debugLog(`Connected to Roku at ${deviceLabel} on port ${port}`);
-				this.setSettings({
-					logLevel: this.getConfig()?.logLevel ?? 'info'
-				}, {
-					socket: socket
-				}).then(() => {
-					resolve(socket);
-				}, (e) => {
-					this.debugLog('Could not set settings', e);
-				});
-			});
-
-			socket.on('error', async (e) => {
-				const errorCode: string = (e as any).code;
-				if (errorCode === 'ECONNREFUSED' || errorCode === 'EPIPE') {
-					if (Date.now() - startTime > timeout) {
-						const error = new Error(`Failed to connect to Roku at ${deviceLabel} on port ${port}. Make sure you have the on device component running on your Roku.`);
-						reject(error);
-						return;
-					}
-
-					this.clientSocket = undefined;
-					await utils.sleep(1000);
-					this.debugLog('Retrying connection due to: ' + errorCode);
-					socketConnect();
-				} else {
-					if (errorCode === 'ETIMEDOUT') {
-						this.debugLog(`Failed to connect to Roku at ${deviceLabel} on port ${port}`);
-					}
-					reject(e);
-				}
-			});
-
-			socket.on('timeout', () => {
-				console.log('socket time out');
-			});
-
-			socket.on('drop', () => {
-				console.log('socket drop');
-			});
-
-			socket.on('close', () => {
-				this.clientSocket = undefined;
-			});
-
-			socket.on('data', (data) => {
-				let offset = 0;
-				while (offset < data.length) {
-					if (!this.receivingRequestResponse) {
-						this.receivingRequestResponse = {
-							json: {},
-							stringLength: data.readInt32LE(0 + offset),
-							binaryLength: data.readInt32LE(4 + offset),
-							stringPayload: '',
-							binaryPayload: Buffer.alloc(0)
-						};
-						offset += this.requestHeaderSize;
-					}
-
-					// Check if we're still receiving the string payload
-					const remainingStringPayload = this.receivingRequestResponse.stringLength - this.receivingRequestResponse.stringPayload.length;
-					if (remainingStringPayload > 0) {
-						const remainingBufferBytes = data.length - offset;
-						if (remainingBufferBytes < remainingStringPayload) {
-							this.receivingRequestResponse.stringPayload += data.toString('utf-8', offset, remainingBufferBytes + offset);
-							return;
-						} else {
-							this.receivingRequestResponse.stringPayload += data.toString('utf-8', offset, remainingStringPayload + offset);
-							offset += remainingStringPayload;
-						}
-					}
-
-					const binaryPayload = this.receivingRequestResponse.binaryPayload;
-					const remainingBinaryPayload = this.receivingRequestResponse.binaryLength - binaryPayload.length;
-					if (remainingBinaryPayload > 0) {
-						const remainingBufferBytes = data.length - offset;
-						if (remainingBufferBytes < remainingBinaryPayload) {
-							const additionalBinaryPayload = data.slice(offset, remainingBufferBytes + offset);
-							this.receivingRequestResponse.binaryPayload = Buffer.concat([binaryPayload, additionalBinaryPayload]);
-							return;
-						} else {
-							const additionalBinaryPayload = data.slice(offset, remainingBinaryPayload + offset);
-							this.receivingRequestResponse.binaryPayload = Buffer.concat([binaryPayload, additionalBinaryPayload]);
-							offset += remainingBinaryPayload;
-						}
-					}
-
-					const receivingRequestResponse = this.receivingRequestResponse;
-					this.receivingRequestResponse = undefined;
-					const json = JSON.parse(receivingRequestResponse.stringPayload);
-
-					receivingRequestResponse.json = json;
-					if (json.id && this.activeRequests[json.id]) {
-						const request = this.activeRequests[json.id];
-
-						if (!request.callback) {
-							// Should never happen as we should always have a callback but just in case
-							console.error('Request did not have callback');
-						} else {
-							request.callback(receivingRequestResponse);
-						}
-					} else {
-						this.debugLog('Received response for unknown request:', json);
-					}
-				}
-			});
-
-			socketConnect();
+			connectWithFreshSocket();
 		});
 
-		this.clientSocketPromise.finally(() => {
+		this.clientSocketPromise = clientSocketPromise;
+
+		// Attach a no-op catch to the finally()-derived promise so a connect failure doesn't surface as an unhandled rejection; callers still await clientSocketPromise itself and get the original rejection.
+		clientSocketPromise.finally(() => {
 			this.clientSocketPromise = undefined;
-		});
+		}).catch(() => { });
 
-		return this.clientSocketPromise;
+		return clientSocketPromise;
 	}
 
 	private async sendRequest(type: ODC.RequestType, args: ODC.RequestArgs, options: ODC.RequestOptions = {}, requestorCallback?: (response: ODC.RequestResponse) => Promise<boolean>) {
