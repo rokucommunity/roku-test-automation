@@ -1,5 +1,6 @@
 import * as needle from 'needle';
-import * as rokuDeploy from 'roku-deploy';
+import { rokuDeploy, DefaultFiles } from 'roku-deploy';
+import type { RokuDeployOptions } from 'roku-deploy';
 import * as fsExtra from 'fs-extra';
 import * as querystring from 'needle/lib/querystring';
 import type * as mocha from 'mocha';
@@ -52,73 +53,69 @@ export class RokuDevice {
 		return configSection.devices[configSection.deviceIndex ?? 0];
 	}
 
-	public async deploy(options?: rokuDeploy.RokuDeployOptions & {
-		injectTestingFiles?: boolean;
-		preventMultipleDeployments?: boolean;
-		deleteBeforeInstall?: boolean; // Remove in v3
-	}, beforeZipCallback?: (info: rokuDeploy.BeforeZipCallbackInfo) => void) {
-		options = rokuDeploy.getOptions(options);
-		if (options.deleteInstalledChannel || options.deleteBeforeInstall) {
-			try {
-				await rokuDeploy.deleteInstalledChannel(options);
-			} catch (e) {
-				// note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
-			}
-		}
-			await this.createPackage(options, beforeZipCallback);
-			const result = await this.publish(options);
-			this.deployed = true;
-			return result;
-    }
+	public async deploy(options?: DeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
+		const { zipPath } = await this.createPackage(options, beforeZipCallback);
+		const result = await this.publish(options, zipPath);
+		this.deployed = true;
+		return result;
+	}
 
-	public async createPackage(options?: rokuDeploy.RokuDeployOptions & {
-		injectTestingFiles?: boolean;
-	}, beforeZipCallback?: (info: rokuDeploy.BeforeZipCallbackInfo) => void) {
+	public async createPackage(options?: CreatePackageOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
 		const injectTestingFiles = options?.injectTestingFiles !== false;
-		options = rokuDeploy.getOptions(options);
 
+		let files = options?.files;
 		if (injectTestingFiles) {
-			const files = options.files ?? [];
-			files.push({
+			// stage() only falls back to the default file set when `files` is omitted, so start from the
+			// default set (or the caller's own list) before appending the RTA testing files
+			files = [...(files ?? DefaultFiles), {
 				src: `${utils.getDeviceFilesPath()}/**/*`,
 				dest: '/'
-			});
-			options.files = files;
+			}];
 		}
 
-		await rokuDeploy.createPackage(options, (info) => {
-			// Manifest modification
-			const manifestPath = `${info.stagingDir}/manifest`;
-			const manifestContents = fsExtra.readFileSync(manifestPath, 'utf-8').replace('ENABLE_RTA=false', 'ENABLE_RTA=true');
-			fsExtra.writeFileSync(manifestPath, manifestContents);
-
-			// update the xml components that we are injecting into
-			const helperInjection = this.getRtaConfig()?.OnDeviceComponent?.helperInjection;
-			if (helperInjection && helperInjection.enabled !== false) {
-				for (const path of helperInjection.componentPaths) {
-					const xmlComponentContents = fsExtra.readFileSync(`${info.stagingDir}/${path}`, 'utf-8');
-					const updatedContents = this.injectRtaHelpersIntoComponentContents(xmlComponentContents);
-					fsExtra.writeFileSync(`${info.stagingDir}/${path}`, updatedContents);
-				}
-			}
-
-			if (beforeZipCallback) {
-				beforeZipCallback(info);
-			}
+		const { stagingDir } = await rokuDeploy.stage({
+			rootDir: options?.rootDir,
+			files: files
 		});
+
+		// Manifest modification
+		const manifestPath = `${stagingDir}/manifest`;
+		const manifestContents = fsExtra.readFileSync(manifestPath, 'utf-8').replace('ENABLE_RTA=false', 'ENABLE_RTA=true');
+		fsExtra.writeFileSync(manifestPath, manifestContents);
+
+		// update the xml components that we are injecting into
+		const helperInjection = this.getRtaConfig()?.OnDeviceComponent?.helperInjection;
+		if (helperInjection && helperInjection.enabled !== false) {
+			for (const path of helperInjection.componentPaths) {
+				const xmlComponentContents = fsExtra.readFileSync(`${stagingDir}/${path}`, 'utf-8');
+				const updatedContents = this.injectRtaHelpersIntoComponentContents(xmlComponentContents);
+				fsExtra.writeFileSync(`${stagingDir}/${path}`, updatedContents);
+			}
+		}
+
+		const info: BeforeZipCallbackInfo = { stagingDir: stagingDir };
+		if (beforeZipCallback) {
+			beforeZipCallback(info);
+		}
+
+		const { zipPath } = await rokuDeploy.zip({ dir: stagingDir });
+		return { stagingDir: stagingDir, zipPath: zipPath };
 	}
 
-	public async publish(options?: rokuDeploy.RokuDeployOptions) {
+	public async publish(options?: DeployOptions, zipPath?: string) {
 		const deviceConfig = this.getCurrentDeviceConfig();
-		options = rokuDeploy.getOptions(options);
-		options.host = deviceConfig.host;
-		options.password = deviceConfig.password;
+		if (!zipPath) {
+			zipPath = (await this.createPackage(options)).zipPath;
+		}
 
-		return await rokuDeploy.publish(options);
-	}
-
-	public getOutputZipFilePath(options: rokuDeploy.RokuDeployOptions) {
-		return rokuDeploy.getOutputZipFilePath(options);
+		return await rokuDeploy.sideload({
+			device: { host: deviceConfig.host },
+			password: deviceConfig.password,
+			zip: zipPath,
+			// v3 defaulted deleteInstalledChannel to true (delete before install); preserve that. A caller
+			// opts out with deleteInstalledChannel: false, and deleteBeforeInstall stays a force-on override.
+			deleteDevChannel: (options?.deleteInstalledChannel ?? true) || !!options?.deleteBeforeInstall
+		});
 	}
 
 	private injectRtaHelpersIntoComponentContents(contents: string) {
@@ -315,3 +312,20 @@ export class RokuDevice {
 		}
 	}
 }
+
+export interface BeforeZipCallbackInfo {
+	/** The staging directory holding the copied files before they are zipped, so callers can modify them */
+	stagingDir: string;
+}
+
+export type CreatePackageOptions = RokuDeployOptions & {
+	/** Inject the RTA testing files into the package. Defaults to true */
+	injectTestingFiles?: boolean;
+};
+
+export type DeployOptions = CreatePackageOptions & {
+	preventMultipleDeployments?: boolean;
+	/** Delete the currently installed dev channel before installing */
+	deleteInstalledChannel?: boolean;
+	deleteBeforeInstall?: boolean; // Remove in v3
+};

@@ -41,7 +41,7 @@
         "path": "^0.12.7",
         "portfinder": "^1.0.33",
         "postman-request": "^2.88.1-postman.48",
-        "roku-deploy": "^3.17.6",
+        "roku-deploy": "^4.0.0-alpha.3",
         "stoppable": "^1.1.0"
     },
     "devDependencies": {
