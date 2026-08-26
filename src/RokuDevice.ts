@@ -4,7 +4,6 @@ import type { DeviceConfig, RokuDeployOptions } from 'roku-deploy';
 import * as fsExtra from 'fs-extra';
 import * as querystring from 'needle/lib/querystring';
 import type * as mocha from 'mocha';
-import * as request from 'postman-request';
 
 import type { ConfigOptions } from './types/ConfigOptions';
 import { utils } from './utils';
@@ -183,11 +182,23 @@ export class RokuDevice {
 	}
 
 	/**
-	 * @param outputFilePath - Where to output the generated screenshot. Extension is automatically appended based on what type of screenshotFormat you have specified for this device
+	 * @param outputFilePath - Where to save the screenshot; the device's image extension is appended automatically.
 	 */
 	public async getScreenshot(outputFilePath?: string) {
-		await this.generateScreenshot();
-		return await this.saveScreenshot(outputFilePath);
+		const result = await rokuDeploy.captureScreenshot({
+			device: this.getRokuDeployDevice(),
+			password: this.getCurrentDeviceConfig().password,
+			out: outputFilePath,
+			autoExtension: true
+		});
+		const format = result.filePath
+			? utils['getPath']().extname(result.filePath).slice(1)
+			: (result.buffer[0] === 0x89 ? 'png' : 'jpg');
+		return {
+			format: format,
+			buffer: result.buffer,
+			path: result.filePath
+		};
 	}
 
 	public async getTestScreenshot(contextOrSuite: mocha.Context | mocha.Suite, basePath = '', postFix = '', separator = '_') {
@@ -242,82 +253,8 @@ export class RokuDevice {
 		return `Telnet output from ${utils.getDeviceLabel(this.getRokuDeployDevice())}\n` + splitContents.join('\n');
 	}
 
-	private async generateScreenshot() {
-		const url = `http://${this.getCurrentDeviceConfig().host}/plugin_inspect`;
-		const formData = {
-			archive: '',
-			mysubmit: 'Screenshot'
-		};
-		const options = this.getNeedleOptions(true);
-
-		const requestOptions = {
-			url: url,
-			auth: {
-				user: options.username,
-				pass: options.password,
-				sendImmediately: false
-			},
-			formData: formData,
-			agentOptions: { 'keepAlive': false }
-		};
-
-		return await new Promise((resolve, reject) => {
-			request.post(requestOptions, (err, resp, body) => {
-				if (err) {
-					return reject(err);
-				}
-				return resolve({ response: resp, body: body });
-			});
-		});
-	}
-
-	private async saveScreenshot(outputFilePath?: string) {
-		const deviceConfig = this.getCurrentDeviceConfig();
-		const options = this.getNeedleOptions(true);
-
-		let ext = deviceConfig.screenshotFormat ?? 'jpg';
-		if (outputFilePath) {
-			await utils.ensureDirExistForFilePath(outputFilePath);
-			options.output = `${outputFilePath}.${ext}`;
-		}
-
-		let url = `http://${deviceConfig.host}/pkgs/dev.${ext}`;
-		let result = await this.needle('get', url, options);
-		if (result.statusCode === 401) {
-			throw new Error(`Could not download screenshot at ${url}. Make sure you have the correct device password`);
-		} else if (result.statusCode === 404) {
-			if (ext === 'jpg') {
-				ext = 'png';
-			} else {
-				ext = 'jpg';
-			}
-			url = `http://${deviceConfig.host}/pkgs/dev.${ext}`;
-			result = await this.needle('get', url, options);
-			if (result.statusCode === 200) {
-				console.log(`Device ${deviceConfig.host} screenshot format was ${deviceConfig.screenshotFormat}. Temporarily updating to ${ext}. Consider updating your config.`);
-				deviceConfig.screenshotFormat = ext;
-			}
-		}
-
-		if (result.statusCode !== 200) {
-			throw new Error(`Could not download screenshot at ${url}. Make sure your sideloaded application is open`);
-		}
-
-		return {
-			format: deviceConfig.screenshotFormat,
-			buffer: result.body as Buffer,
-			path: options.output
-		};
-	}
-
-	private getNeedleOptions(requiresAuth = false) {
+	private getNeedleOptions() {
 		const options: needle.NeedleOptions = {};
-		if (requiresAuth) {
-			options.username = 'rokudev';
-			options.password = this.getCurrentDeviceConfig().password;
-			options.auth = 'digest';
-		}
-
 		options.proxy = this.getConfig().proxy;
 		return options;
 	}
