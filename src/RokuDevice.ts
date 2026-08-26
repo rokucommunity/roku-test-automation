@@ -152,16 +152,6 @@ export class RokuDevice {
 	}
 
 	private async sendEcp(path: string, params = {}, method: 'GET' | 'POST', options: HttpRequestOptions = {}): Promise<EcpResponse> {
-		const result = await this.sendEcpRaw(path, params, method, options);
-		//parse outside the retry so a malformed response body does not trigger transport retries
-		return {
-			status: result.status,
-			headers: result.headers,
-			body: parseEcpResponse(result)
-		};
-	}
-
-	private async sendEcpRaw(path: string, params = {}, method: 'GET' | 'POST', options: HttpRequestOptions = {}): Promise<EcpResult> {
 		let route = path;
 		let retryCount = options.retryCount;
 		if (retryCount === undefined) {
@@ -172,17 +162,25 @@ export class RokuDevice {
 			route = `${path}?${querystring.stringify(params)}`;
 		}
 
+		let result: EcpResult;
 		try {
-			return await rokuDeploy.sendEcpRequest(this.getRokuDeployDevice(), route, { method: method });
+			result = await rokuDeploy.sendEcpRequest(this.getRokuDeployDevice(), route, { method: method });
 		} catch (e) {
 			if ((retryCount - 1) > 0) {
 				this.debugLog(`ECP request to ${route} failed. Retrying.`);
 				// Want to delay retry slightly
 				await utils.sleep(50);
-				return this.sendEcpRaw(path, params, method, {...options, retryCount: retryCount - 1});
+				return this.sendEcp(path, params, method, {...options, retryCount: retryCount - 1});
 			}
+			throw utils.makeError('sendEcpError', `ECP request to ${route} failed and no retries left`);
 		}
-		throw utils.makeError('sendEcpError', `ECP request to ${route} failed and no retries left`);
+
+		//parse outside the try so a malformed response body does not trigger transport retries
+		return {
+			status: result.status,
+			headers: result.headers,
+			body: parseEcpResponse(result)
+		};
 	}
 
 	/**
