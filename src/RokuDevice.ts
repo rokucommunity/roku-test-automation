@@ -1,10 +1,9 @@
 import * as needle from 'needle';
-import { rokuDeploy, DefaultFiles } from 'roku-deploy';
+import { rokuDeploy, DefaultFiles, createRokuDeploySocket } from 'roku-deploy';
 import type { DeviceConfig, RokuDeployOptions } from 'roku-deploy';
 import * as fsExtra from 'fs-extra';
 import * as querystring from 'needle/lib/querystring';
 import type * as mocha from 'mocha';
-import * as net from 'net';
 import * as request from 'postman-request';
 
 import type { ConfigOptions } from './types/ConfigOptions';
@@ -198,7 +197,7 @@ export class RokuDevice {
 
 	public async getTelnetLog() {
 		return new Promise<string>((resolve, reject) => {
-			const socket = net.createConnection(8085, this.getCurrentDeviceConfig().host);
+			const socket = createRokuDeploySocket({ device: this.getRokuDeployDevice(), port: 8085 });
 
 			let content = '';
 			let timeout;
@@ -226,6 +225,8 @@ export class RokuDevice {
 				reject(e);
 				socket.destroy();
 			});
+
+			socket.connect();
 		});
 	}
 
@@ -238,7 +239,7 @@ export class RokuDevice {
 				break;
 			}
 		}
-		return `Telnet output from ${this.getCurrentDeviceConfig().host}\n` + splitContents.join('\n');
+		return `Telnet output from ${utils.getDeviceLabel(this.getRokuDeployDevice())}\n` + splitContents.join('\n');
 	}
 
 	private async generateScreenshot() {
