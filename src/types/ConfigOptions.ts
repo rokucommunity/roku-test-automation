@@ -25,7 +25,10 @@ export interface RokuDeviceConfigOptions {
 	/** zero based index of which `devices` index to use. If not provided defaults to 0 */
 	deviceIndex?: number;
 
-	/** Useful for debugging port 80 and ECP communication between Roku and client. Use in the format like (127.0.0.1:8888). */
+	/**
+	 * Formerly routed RTA's port 80 and ECP requests through a debugging proxy like (127.0.0.1:8888).
+	 * @deprecated No longer functional: device HTTP now goes through roku-deploy, which has no proxy support. Use the NetworkProxy class to inspect device-originated traffic.
+	 */
 	proxy?: string;
 }
 

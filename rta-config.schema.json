@@ -187,7 +187,7 @@
                     "type": "array"
                 },
                 "proxy": {
-                    "description": "Useful for debugging port 80 and ECP communication between Roku and client. Use in the format like (127.0.0.1:8888).",
+                    "description": "Formerly routed RTA's port 80 and ECP requests through a debugging proxy like (127.0.0.1:8888).",
                     "type": "string"
                 }
             },
