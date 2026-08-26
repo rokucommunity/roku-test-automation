@@ -693,7 +693,8 @@ export class OnDeviceComponent {
 		}
 
 		this.clientSocketPromise = new Promise<RokuDeploySocket>((resolve, reject) => {
-			const port = 9000;
+			//TESTING: was 9000; RCE instances only proxy whitelisted ports plus the ephemeral range 49152-65535, and 9000 is not proxied. Must match RTA_OnDeviceComponentTask.brs
+			const port = 50000;
 			const rokuDeployDevice = this.device.getRokuDeployDevice();
 			const deviceLabel = utils.getDeviceLabel(rokuDeployDevice);
 			const timeout = this.getTimeOut(options);
