@@ -30,8 +30,20 @@ export interface RokuDeviceConfigOptions {
 }
 
 export interface DeviceConfigOptions {
-	/** The IP address or hostname of the target Roku device. */
-	host: string;
+	/** The IP address or hostname of a local Roku device. Provide this for a local device, or one of the Roku Cloud Emulator identifiers (id, esn, instanceUrl) for a cloud device. */
+	host?: string;
+
+	/** Roku Cloud Emulator device id (the numeric id assigned by the management api) */
+	id?: number;
+
+	/** Roku Cloud Emulator device esn */
+	esn?: string;
+
+	/** Roku Cloud Emulator instance url, to address a running instance directly */
+	instanceUrl?: string;
+
+	/** Bearer token used to authenticate Roku Cloud Emulator requests */
+	rceToken?: string;
 
 	/** The password for logging in to the developer portal on the target Roku device */
 	password: string;

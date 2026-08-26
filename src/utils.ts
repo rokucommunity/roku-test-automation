@@ -4,6 +4,8 @@ import type * as Mocha from 'mocha';
 import * as Ajv from 'ajv';
 const ajv = new Ajv();
 
+import { isRceDeviceConfig, isRceDeviceConfigById, isRceDeviceConfigByUrl } from 'roku-deploy';
+import type { DeviceConfig } from 'roku-deploy';
 import type { ConfigOptions, DeviceConfigOptions } from './types/ConfigOptions';
 import type { BoundingRect } from './types/OnDeviceComponent';
 import type { AppUIResponse, AppUIResponseChild } from './types/AppUIResponse';
@@ -205,6 +207,20 @@ class Utils {
 		const error = new Error(message);
 		error.name = name;
 		return error;
+	}
+
+	/** Human-readable device id for logs. */
+	public getDeviceLabel(device: DeviceConfig): string | undefined {
+		if (!device) {
+			return undefined;
+		}
+		if (isRceDeviceConfig(device)) {
+			if (isRceDeviceConfigByUrl(device)) {
+				return device.instanceUrl;
+			}
+			return isRceDeviceConfigById(device) ? String(device.id) : device.esn;
+		}
+		return device.host;
 	}
 
 	public getTestTitlePath(contextOrSuite: Mocha.Context | Mocha.Suite, sanitize = true) {

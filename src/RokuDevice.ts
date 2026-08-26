@@ -1,6 +1,6 @@
 import * as needle from 'needle';
 import { rokuDeploy, DefaultFiles } from 'roku-deploy';
-import type { RokuDeployOptions } from 'roku-deploy';
+import type { DeviceConfig, RokuDeployOptions } from 'roku-deploy';
 import * as fsExtra from 'fs-extra';
 import * as querystring from 'needle/lib/querystring';
 import type * as mocha from 'mocha';
@@ -53,6 +53,24 @@ export class RokuDevice {
 		return configSection.devices[configSection.deviceIndex ?? 0];
 	}
 
+	/** Build the roku-deploy device config for the selected device. */
+	public getRokuDeployDevice(): DeviceConfig {
+		const deviceConfig = this.getCurrentDeviceConfig();
+		if (deviceConfig.host) {
+			return { host: deviceConfig.host };
+		}
+		if (deviceConfig.id !== undefined) {
+			return { id: deviceConfig.id, rceToken: deviceConfig.rceToken };
+		}
+		if (deviceConfig.esn) {
+			return { esn: deviceConfig.esn, rceToken: deviceConfig.rceToken };
+		}
+		if (deviceConfig.instanceUrl) {
+			return { instanceUrl: deviceConfig.instanceUrl, rceToken: deviceConfig.rceToken };
+		}
+		throw utils.makeError('InvalidDeviceConfigError', 'Device config must specify a host, id, esn, or instanceUrl');
+	}
+
 	public async deploy(options?: DeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
 		const { zipPath } = await this.createPackage(options, beforeZipCallback);
 		const result = await this.publish(options, zipPath);
@@ -65,8 +83,7 @@ export class RokuDevice {
 
 		let files = options?.files;
 		if (injectTestingFiles) {
-			// stage() only falls back to the default file set when `files` is omitted, so start from the
-			// default set (or the caller's own list) before appending the RTA testing files
+			// stage() only defaults files when the key is omitted, so seed from DefaultFiles before appending
 			files = [...(files ?? DefaultFiles), {
 				src: `${utils.getDeviceFilesPath()}/**/*`,
 				dest: '/'
@@ -109,11 +126,9 @@ export class RokuDevice {
 		}
 
 		return await rokuDeploy.sideload({
-			device: { host: deviceConfig.host },
+			device: this.getRokuDeployDevice(),
 			password: deviceConfig.password,
 			zip: zipPath,
-			// v3 defaulted deleteInstalledChannel to true (delete before install); preserve that. A caller
-			// opts out with deleteInstalledChannel: false, and deleteBeforeInstall stays a force-on override.
 			deleteDevChannel: (options?.deleteInstalledChannel ?? true) || !!options?.deleteBeforeInstall
 		});
 	}

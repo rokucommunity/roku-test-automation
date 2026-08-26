@@ -1,4 +1,5 @@
-import * as net from 'net';
+import { createRokuDeploySocket } from 'roku-deploy';
+import type { RokuDeploySocket } from 'roku-deploy';
 
 import type { RokuDevice } from './RokuDevice';
 import type { ConfigOptions } from './types/ConfigOptions';
@@ -15,8 +16,8 @@ export class OnDeviceComponent {
 	private config?: ConfigOptions;
 	private activeRequests: { [key: string]: ODC.Request } = {};
 	private receivingRequestResponse?: ODC.RequestResponse;
-	private clientSocket?: net.Socket;
-	private clientSocketPromise?: Promise<net.Socket>;
+	private clientSocket?: RokuDeploySocket;
+	private clientSocketPromise?: Promise<RokuDeploySocket>;
 
 	constructor(device: RokuDevice, config?: ConfigOptions) {
 		if (config) {
@@ -691,20 +692,21 @@ export class OnDeviceComponent {
 			return this.clientSocketPromise;
 		}
 
-		this.clientSocketPromise = new Promise<net.Socket>((resolve, reject) => {
+		this.clientSocketPromise = new Promise<RokuDeploySocket>((resolve, reject) => {
 			const port = 9000;
-			const host = this.device.getCurrentDeviceConfig().host;
+			const rokuDeployDevice = this.device.getRokuDeployDevice();
+			const deviceLabel = utils.getDeviceLabel(rokuDeployDevice);
 			const timeout = this.getTimeOut(options);
 			const startTime = Date.now();
-			const socket = new net.Socket();
+			const socket = createRokuDeploySocket({ device: rokuDeployDevice, port: port });
 
 			const socketConnect = () => {
-				this.debugLog(`Attempting to connect to Roku at ${host} on port ${port}`);
-				socket.connect(port, host);
+				this.debugLog(`Attempting to connect to Roku at ${deviceLabel} on port ${port}`);
+				socket.connect();
 			};
 
 			socket.on('connect', () => {
-				this.debugLog(`Connected to Roku at ${host} on port ${port}`);
+				this.debugLog(`Connected to Roku at ${deviceLabel} on port ${port}`);
 				this.setSettings({
 					logLevel: this.getConfig()?.logLevel ?? 'info'
 				}, {
@@ -720,7 +722,7 @@ export class OnDeviceComponent {
 				const errorCode: string = (e as any).code;
 				if (errorCode === 'ECONNREFUSED' || errorCode === 'EPIPE') {
 					if (Date.now() - startTime > timeout) {
-						const error = new Error(`Failed to connect to Roku at ${host} on port ${port}. Make sure you have the on device component running on your Roku.`);
+						const error = new Error(`Failed to connect to Roku at ${deviceLabel} on port ${port}. Make sure you have the on device component running on your Roku.`);
 						reject(error);
 						return;
 					}
@@ -731,7 +733,7 @@ export class OnDeviceComponent {
 					socketConnect();
 				} else {
 					if (errorCode === 'ETIMEDOUT') {
-						this.debugLog(`Failed to connect to Roku at ${host} on port ${port}`);
+						this.debugLog(`Failed to connect to Roku at ${deviceLabel} on port ${port}`);
 					}
 					reject(e);
 				}
@@ -865,7 +867,7 @@ export class OnDeviceComponent {
 			requestBuffers.push(binaryBuffer);
 		}
 
-		let clientSocket: net.Socket;
+		let clientSocket: RokuDeploySocket;
 		if (options.socket) {
 			clientSocket = options.socket;
 		} else {
