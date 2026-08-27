@@ -223,20 +223,24 @@ class Utils {
 	}
 
 	//local copies of roku-deploy's device-config guards; a value import of roku-deploy would pull node-only modules into browser bundles of this file
-	private isRceDeviceConfig(device: DeviceConfigLike): device is RceDeviceConfig {
+	public isLocalDeviceConfig(device: DeviceConfigLike): device is LocalDeviceConfig {
+		return !!device.host;
+	}
+
+	public isRceDeviceConfig(device: DeviceConfigLike): device is RceDeviceConfig {
 		return this.isRceDeviceConfigByEsn(device) || this.isRceDeviceConfigById(device) || this.isRceDeviceConfigByUrl(device);
 	}
 
-	private isRceDeviceConfigByEsn(device: DeviceConfigLike): device is RceDeviceConfigByEsn {
+	public isRceDeviceConfigByEsn(device: DeviceConfigLike): device is RceDeviceConfigByEsn {
 		return !!device.esn;
 	}
 
-	private isRceDeviceConfigById(device: DeviceConfigLike): device is RceDeviceConfigById {
+	public isRceDeviceConfigById(device: DeviceConfigLike): device is RceDeviceConfigById {
 		//0 is a valid id so an explicit undefined check
 		return device.id !== undefined;
 	}
 
-	private isRceDeviceConfigByUrl(device: DeviceConfigLike): device is RceDeviceConfigByUrl {
+	public isRceDeviceConfigByUrl(device: DeviceConfigLike): device is RceDeviceConfigByUrl {
 		return !!device.instanceUrl;
 	}
 

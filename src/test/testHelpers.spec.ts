@@ -32,17 +32,17 @@ export function setupTestEnvironment() {
 		}];
 	} else if (process.env.ROKU_HOST && process.env.ROKU_PASSWORD) {
 		if (config.RokuDevice?.devices) {
-			config.RokuDevice.devices.map(x => {
-				//override the host and password with environment variables so CI/CD unit tests actually work
-				x.host = process.env.ROKU_HOST as string;
-				x.password = process.env.ROKU_PASSWORD as string;
-				return x;
-			});
+			//override the host and password with environment variables so CI/CD unit tests actually work
+			config.RokuDevice.devices = config.RokuDevice.devices.map(x => ({
+				...x,
+				host: process.env.ROKU_HOST as string,
+				password: process.env.ROKU_PASSWORD as string
+			}));
 		}
 	}
 	//if we don't have a device address or password, fail here so our tests have better error messages
 	const devices = config.RokuDevice?.devices ?? [];
-	if (devices.length === 0 || devices.some(x => (!x.host && x.id === undefined && !x.esn && !x.instanceUrl) || !x.password)) {
+	if (devices.length === 0 || devices.some(x => !(utils.isLocalDeviceConfig(x) || utils.isRceDeviceConfig(x)) || !x.password)) {
 		throw new Error(
 			`Missing Roku device address and/or password. Set ROKU_HOST and ROKU_PASSWORD (or ROKU_RCE_DEVICE_ID, ROKU_RCE_TOKEN, and ROKU_RCE_PASSWORD for a cloud emulator device) in "${path.join(repoRootDir, '.env')}" or update the host & password in "${configFilePath}".`
 		);

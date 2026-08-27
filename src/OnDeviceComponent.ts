@@ -992,7 +992,7 @@ export class OnDeviceComponent {
 		if (this.getConfig()?.clientDebugLogging) {
 			const date = new Date;
 			const formattedDate = `${utils.lpad(date.getMonth() + 1)}-${utils.lpad(date.getDate())} ${utils.lpad(date.getHours())}:${utils.lpad(date.getMinutes())}:${utils.lpad(date.getSeconds())}:${utils.lpad(date.getMilliseconds(), 3)}`;
-			console.log(`${formattedDate} [ODC][${this.device.getCurrentDeviceConfig().host}] ${message}`, ...args);
+			console.log(`${formattedDate} [ODC][${utils.getDeviceLabel(this.device.getCurrentDeviceConfig())}] ${message}`, ...args);
 		}
 	}
 }

@@ -52,18 +52,18 @@ export class RokuDevice {
 	/** Build the roku-deploy device config for the selected device. */
 	public getRokuDeployDevice(): DeviceConfig {
 		const deviceConfig = this.getCurrentDeviceConfig();
-		if (deviceConfig.host) {
+		if (utils.isLocalDeviceConfig(deviceConfig)) {
 			return { host: deviceConfig.host };
 		}
 		// device-level rceToken wins over the root config, which wins over the environment variable
 		const rceToken = deviceConfig.rceToken ?? this.getRtaConfig()?.rceToken ?? process.env.ROKU_RCE_TOKEN;
-		if (deviceConfig.id !== undefined) {
+		if (utils.isRceDeviceConfigById(deviceConfig)) {
 			return { id: deviceConfig.id, rceToken: rceToken };
 		}
-		if (deviceConfig.esn) {
+		if (utils.isRceDeviceConfigByEsn(deviceConfig)) {
 			return { esn: deviceConfig.esn, rceToken: rceToken };
 		}
-		if (deviceConfig.instanceUrl) {
+		if (utils.isRceDeviceConfigByUrl(deviceConfig)) {
 			return { instanceUrl: deviceConfig.instanceUrl, rceToken: rceToken };
 		}
 		throw utils.makeError('InvalidDeviceConfigError', 'Device config must specify a host, id, esn, or instanceUrl');
