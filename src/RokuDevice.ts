@@ -71,7 +71,7 @@ export class RokuDevice {
 
 	public async deploy(options?: DeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
 		const { zipPath } = await this.createPackage(options, beforeZipCallback);
-		const result = await this.publish(options, zipPath);
+		const result = await this.publish({ ...options, zipPath: zipPath });
 		this.deployed = true;
 		return result;
 	}
@@ -117,8 +117,9 @@ export class RokuDevice {
 		return { stagingDir: stagingDir, zipPath: zipPath };
 	}
 
-	public async publish(options?: DeployOptions, zipPath?: string) {
+	public async publish(options?: DeployOptions & {zipPath?: string}) {
 		const deviceConfig = this.getCurrentDeviceConfig();
+		let zipPath = options?.zipPath;
 		if (!zipPath) {
 			zipPath = (await this.createPackage(options)).zipPath;
 		}
