@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.0-alpha.1](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.0...v3.0.0-alpha.1) - 2026-08-28
+### Added
+ - Roku Cloud Emulator (RCE) device support ([#177](https://github.com/rokucommunity/roku-test-automation/pull/177))
+### Changed
+ - Security enhancements ([#176](https://github.com/rokucommunity/roku-test-automation/pull/176))
+ - upgrade to [roku-deploy@4.0.0-alpha.5](https://github.com/rokucommunity/roku-deploy/blob/master/CHANGELOG.md#400-alpha5---2026-08-28). Notable changes since 3.17.6:
+     - Roku Cloud Emulator support ([#331](https://github.com/rokucommunity/roku-deploy/pull/331))
+### Fixed
+ - fix: Update type checks in RTA helper functions for improved accuracy ([#171](https://github.com/rokucommunity/roku-test-automation/pull/171))
+
+
+
 ## [3.0.0-alpha.0](https://github.com/rokucommunity/roku-test-automation/compare/2.2.2...v3.0.0-alpha.0) - 2026-06-23
 ### Changed
  - Project restructure ([#165](https://github.com/rokucommunity/roku-test-automation/pull/165))
