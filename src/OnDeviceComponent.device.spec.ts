@@ -15,7 +15,8 @@ import { setupTestEnvironment } from './test/testHelpers.spec';
 type Unwrap<T> = T extends Promise<infer U> ? U : T extends (...args: any) => Promise<infer U> ? U : T extends (...args: any) => infer U ? U : T;
 
 describe('OnDeviceComponent', function () {
-	before(async () => {
+	before(async function () {
+		this.timeout(120_000);
 		setupTestEnvironment();
 		await device.deploy({
 			rootDir: 'testProject',

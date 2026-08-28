@@ -10,7 +10,9 @@ import { ecp, device } from './';
 import { setupTestEnvironment } from './test/testHelpers.spec';
 
 describe('RokuDevice', function () {
-	before(async () => {
+	before(async function () {
+		//launching the channel and waiting for it to become active takes well over the default 10s timeout
+		this.timeout(120_000);
 		setupTestEnvironment();
 		await ecp.sendLaunchChannel();
 	});
