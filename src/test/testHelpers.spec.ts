@@ -1,5 +1,6 @@
 import * as fsExtra from 'fs-extra';
-import type * as needle from 'needle';
+import type { EcpResponse } from '../RokuDevice';
+import { parseEcpResponse } from '../EcpXml';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
@@ -22,21 +23,28 @@ export function setupTestEnvironment() {
 
 	const configFilePath = path.resolve(repoRootDir, 'testProject/rta-config.json');
 	const config = utils['getConfigFromConfigFileCore'](configFilePath);
-	if (process.env.ROKU_HOST && process.env.ROKU_PASSWORD) {
+	if (process.env.ROKU_RCE_DEVICE_ID && process.env.ROKU_RCE_TOKEN && process.env.ROKU_RCE_PASSWORD) {
+		//target a Roku Cloud Emulator device instead of a local one
+		config.RokuDevice.devices = [{
+			id: Number(process.env.ROKU_RCE_DEVICE_ID),
+			rceToken: process.env.ROKU_RCE_TOKEN,
+			password: process.env.ROKU_RCE_PASSWORD
+		}];
+	} else if (process.env.ROKU_HOST && process.env.ROKU_PASSWORD) {
 		if (config.RokuDevice?.devices) {
-			config.RokuDevice.devices.map(x => {
-				//override the host and password with environment variables so CI/CD unit tests actually work
-				x.host = process.env.ROKU_HOST as string;
-				x.password = process.env.ROKU_PASSWORD as string;
-				return x;
-			});
+			//override the host and password with environment variables so CI/CD unit tests actually work
+			config.RokuDevice.devices = config.RokuDevice.devices.map(x => ({
+				...x,
+				host: process.env.ROKU_HOST as string,
+				password: process.env.ROKU_PASSWORD as string
+			}));
 		}
 	}
-	//if we don't have a host or password, fail here so our tests have better error messages
+	//if we don't have a device address or password, fail here so our tests have better error messages
 	const devices = config.RokuDevice?.devices ?? [];
-	if (devices.length === 0 || devices.some(x => !x.host || !x.password)) {
+	if (devices.length === 0 || devices.some(x => !(utils.isLocalDeviceConfig(x) || utils.isRceDeviceConfig(x)) || !x.password)) {
 		throw new Error(
-			`Missing Roku device host and/or password. Set ROKU_HOST and ROKU_PASSWORD in "${path.join(repoRootDir, '.env')}" or update the host & password in "${configFilePath}".`
+			`Missing Roku device address and/or password. Set ROKU_HOST and ROKU_PASSWORD (or ROKU_RCE_DEVICE_ID, ROKU_RCE_TOKEN, and ROKU_RCE_PASSWORD for a cloud emulator device) in "${path.join(repoRootDir, '.env')}" or update the host & password in "${configFilePath}".`
 		);
 	}
 	utils.setupEnvironmentFromConfig(config);
@@ -77,11 +85,11 @@ export async function getTestMock(contextOrSuiteOrString: Mocha.Context | Mocha.
 	}
 }
 
-export async function getNeedleMockResponse(contextOrSuiteOrString: Mocha.Context | Mocha.Suite | string, extension: MockFileFormat = 'json'): Promise<needle.NeedleResponse> {
-	const mock: any = {
-		body: await getTestMock(contextOrSuiteOrString, extension)
-	};
-	return mock;
+export async function getEcpMockResponse(contextOrSuiteOrString: Mocha.Context | Mocha.Suite | string, status = 200): Promise<EcpResponse> {
+	const xml = await getTestMock(contextOrSuiteOrString, 'xml') as string;
+	const headers = { 'content-type': 'text/xml; charset="utf-8"' };
+	//run the real parser over the xml fixture so specs exercise it and consumers get the parsed body shape
+	return { status: status, headers: headers, body: parseEcpResponse({ status: status, body: xml, headers: headers }) };
 }
 
 declare type MockFileFormat = 'json' | 'xml';

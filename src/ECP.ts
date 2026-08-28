@@ -121,11 +121,9 @@ export class ECP {
 				wait = keypressDelay;
 			}
 
-			const encodedKey = encodeURIComponent(key);
-
 			for (let i = 0; i < (pressOptions?.count ?? 1); i++) {
 				if (keydown) {
-					await this.device.sendEcpPost(`keydown/${encodedKey}`);
+					await this.device.sendKeyDown(key);
 				}
 
 				if (duration) {
@@ -133,7 +131,7 @@ export class ECP {
 				}
 
 				if (keyup) {
-					await this.device.sendEcpPost(`keyup/${encodedKey}`);
+					await this.device.sendKeyUp(key);
 				}
 
 				if (wait) await this.utils.sleep(wait);
@@ -177,7 +175,7 @@ export class ECP {
 			this.addRaspFileStep(`press: ${raspEquivalent}`);
 		}
 
-		await this.device.sendEcpPost(`keypress/${encodeURIComponent(key)}`);
+		await this.device.sendKeyPress(key);
 
 		const keypressDelay = this.getConfig()?.default?.keypressDelay;
 		let wait = options?.wait;
@@ -262,7 +260,7 @@ export class ECP {
 		// We always append a param as if none is passed and the application is already running it will not restart the application
 		params['RTA_LAUNCH'] = 1;
 
-		await this.device.sendEcpPost(`launch/${channelId}`, params, undefined, options);
+		await this.device.sendEcpPost(`launch/${channelId}`, params, options);
 		if (verifyLaunch) {
 			const startTime = new Date();
 			while (new Date().valueOf() - startTime.valueOf() < verifyLaunchTimeOut) {
@@ -282,7 +280,7 @@ export class ECP {
 		params = {},
 		options = {} as HttpRequestOptions
 	} = {}) {
-		await this.device.sendEcpPost(`input`, params, undefined, options);
+		await this.device.sendEcpPost(`input`, params, options);
 	}
 
 	public async getActiveApp(options: HttpRequestOptions = {}) {
@@ -678,9 +676,9 @@ export class ECP {
 	}
 
 	public async getChanperf(options: HttpRequestOptions = {}) {
-		const { body } = await this.device.sendEcpGet(`query/chanperf`, undefined, options);
+		const result = await this.device.sendEcpGet(`query/chanperf`, undefined, options);
 
-		const response = this.simplifyEcpResponse(body);
+		const response = this.simplifyEcpResponse(result.body);
 		const plugin = response.plugin;
 
 		if (plugin) {

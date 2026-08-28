@@ -1,4 +1,4 @@
-import type { Socket } from 'net';
+import type { RokuDeploySocket } from 'roku-deploy';
 
 export enum RequestType {
 	assignElementIdOnAllNodes = 'assignElementIdOnAllNodes',
@@ -81,7 +81,7 @@ export interface RequestOptions {
 	timeout?: number;
 
 	/** Allows for passing in a socket to allow sending a request before our socket promise has resolved */
-	socket?: Socket;
+	socket?: RokuDeploySocket;
 }
 
 export interface Request {

@@ -1,13 +1,11 @@
-import * as needle from 'needle';
-import * as rokuDeploy from 'roku-deploy';
+import { rokuDeploy, DefaultFiles, createRokuDeploySocket } from 'roku-deploy';
+import type { DeviceConfig, EcpResult, RokuDeployOptions } from 'roku-deploy';
 import * as fsExtra from 'fs-extra';
-import * as querystring from 'needle/lib/querystring';
-import type * as mocha from 'mocha';
-import * as net from 'net';
-import * as request from 'postman-request';
-
+import * as querystring from 'querystring';
 import type { ConfigOptions } from './types/ConfigOptions';
 import { utils } from './utils';
+import type * as mocha from 'mocha';
+import { parseEcpResponse } from './EcpXml';
 
 export interface HttpRequestOptions {
 	/** How many times to retry the request before throwing an error. Defaults to 3 if not specified */
@@ -17,7 +15,6 @@ export interface HttpRequestOptions {
 export class RokuDevice {
 	public deployed = false;
 	private config?: ConfigOptions;
-	private needle = needle;
 
 	constructor(config?: ConfigOptions) {
 		if (config) {
@@ -52,73 +49,87 @@ export class RokuDevice {
 		return configSection.devices[configSection.deviceIndex ?? 0];
 	}
 
-	public async deploy(options?: rokuDeploy.RokuDeployOptions & {
-		injectTestingFiles?: boolean;
-		preventMultipleDeployments?: boolean;
-		deleteBeforeInstall?: boolean; // Remove in v3
-	}, beforeZipCallback?: (info: rokuDeploy.BeforeZipCallbackInfo) => void) {
-		options = rokuDeploy.getOptions(options);
-		if (options.deleteInstalledChannel || options.deleteBeforeInstall) {
-			try {
-				await rokuDeploy.deleteInstalledChannel(options);
-			} catch (e) {
-				// note we don't report the error; as we don't actually care that we could not deploy - it's just useless noise to log it.
-			}
+	/** Build the roku-deploy device config for the selected device. */
+	public getRokuDeployDevice(): DeviceConfig {
+		const deviceConfig = this.getCurrentDeviceConfig();
+		if (utils.isLocalDeviceConfig(deviceConfig)) {
+			return { host: deviceConfig.host };
 		}
-			await this.createPackage(options, beforeZipCallback);
-			const result = await this.publish(options);
-			this.deployed = true;
-			return result;
-    }
+		// device-level rceToken wins over the root config, which wins over the environment variable
+		const rceToken = deviceConfig.rceToken ?? this.getRtaConfig()?.rceToken ?? process.env.ROKU_RCE_TOKEN;
+		if (utils.isRceDeviceConfigById(deviceConfig)) {
+			return { id: deviceConfig.id, rceToken: rceToken };
+		}
+		if (utils.isRceDeviceConfigByEsn(deviceConfig)) {
+			return { esn: deviceConfig.esn, rceToken: rceToken };
+		}
+		if (utils.isRceDeviceConfigByUrl(deviceConfig)) {
+			return { instanceUrl: deviceConfig.instanceUrl, rceToken: rceToken };
+		}
+		throw utils.makeError('InvalidDeviceConfigError', 'Device config must specify a host, id, esn, or instanceUrl');
+	}
 
-	public async createPackage(options?: rokuDeploy.RokuDeployOptions & {
-		injectTestingFiles?: boolean;
-	}, beforeZipCallback?: (info: rokuDeploy.BeforeZipCallbackInfo) => void) {
+	public async deploy(options?: DeployOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
+		const { zipPath } = await this.createPackage(options, beforeZipCallback);
+		const result = await this.publish({ ...options, zipPath: zipPath });
+		this.deployed = true;
+		return result;
+	}
+
+	public async createPackage(options?: CreatePackageOptions, beforeZipCallback?: (info: BeforeZipCallbackInfo) => void) {
 		const injectTestingFiles = options?.injectTestingFiles !== false;
-		options = rokuDeploy.getOptions(options);
 
+		let files = options?.files;
 		if (injectTestingFiles) {
-			const files = options.files ?? [];
-			files.push({
+			// stage() only defaults files when the key is omitted, so seed from DefaultFiles before appending
+			files = [...(files ?? DefaultFiles), {
 				src: `${utils.getDeviceFilesPath()}/**/*`,
 				dest: '/'
-			});
-			options.files = files;
+			}];
 		}
 
-		await rokuDeploy.createPackage(options, (info) => {
-			// Manifest modification
-			const manifestPath = `${info.stagingDir}/manifest`;
-			const manifestContents = fsExtra.readFileSync(manifestPath, 'utf-8').replace('ENABLE_RTA=false', 'ENABLE_RTA=true');
-			fsExtra.writeFileSync(manifestPath, manifestContents);
-
-			// update the xml components that we are injecting into
-			const helperInjection = this.getRtaConfig()?.OnDeviceComponent?.helperInjection;
-			if (helperInjection && helperInjection.enabled !== false) {
-				for (const path of helperInjection.componentPaths) {
-					const xmlComponentContents = fsExtra.readFileSync(`${info.stagingDir}/${path}`, 'utf-8');
-					const updatedContents = this.injectRtaHelpersIntoComponentContents(xmlComponentContents);
-					fsExtra.writeFileSync(`${info.stagingDir}/${path}`, updatedContents);
-				}
-			}
-
-			if (beforeZipCallback) {
-				beforeZipCallback(info);
-			}
+		const { stagingDir } = await rokuDeploy.stage({
+			rootDir: options?.rootDir,
+			files: files
 		});
+
+		// Manifest modification
+		const manifestPath = `${stagingDir}/manifest`;
+		const manifestContents = fsExtra.readFileSync(manifestPath, 'utf-8').replace('ENABLE_RTA=false', 'ENABLE_RTA=true');
+		fsExtra.writeFileSync(manifestPath, manifestContents);
+
+		// update the xml components that we are injecting into
+		const helperInjection = this.getRtaConfig()?.OnDeviceComponent?.helperInjection;
+		if (helperInjection && helperInjection.enabled !== false) {
+			for (const path of helperInjection.componentPaths) {
+				const xmlComponentContents = fsExtra.readFileSync(`${stagingDir}/${path}`, 'utf-8');
+				const updatedContents = this.injectRtaHelpersIntoComponentContents(xmlComponentContents);
+				fsExtra.writeFileSync(`${stagingDir}/${path}`, updatedContents);
+			}
+		}
+
+		const info: BeforeZipCallbackInfo = { stagingDir: stagingDir };
+		if (beforeZipCallback) {
+			beforeZipCallback(info);
+		}
+
+		const { zipPath } = await rokuDeploy.zip({ dir: stagingDir });
+		return { stagingDir: stagingDir, zipPath: zipPath };
 	}
 
-	public async publish(options?: rokuDeploy.RokuDeployOptions) {
+	public async publish(options?: DeployOptions & {zipPath?: string}) {
 		const deviceConfig = this.getCurrentDeviceConfig();
-		options = rokuDeploy.getOptions(options);
-		options.host = deviceConfig.host;
-		options.password = deviceConfig.password;
+		let zipPath = options?.zipPath;
+		if (!zipPath) {
+			zipPath = (await this.createPackage(options)).zipPath;
+		}
 
-		return await rokuDeploy.publish(options);
-	}
-
-	public getOutputZipFilePath(options: rokuDeploy.RokuDeployOptions) {
-		return rokuDeploy.getOutputZipFilePath(options);
+		return await rokuDeploy.sideload({
+			device: this.getRokuDeployDevice(),
+			password: deviceConfig.password,
+			zip: zipPath,
+			deleteDevChannel: (options?.deleteInstalledChannel ?? true) || !!options?.deleteBeforeInstall
+		});
 	}
 
 	private injectRtaHelpersIntoComponentContents(contents: string) {
@@ -135,48 +146,96 @@ export class RokuDevice {
 		return updatedContents;
 	}
 
-	public sendEcpPost(path: string, params = {}, body: needle.BodyData = '', options: HttpRequestOptions = {}): Promise<needle.NeedleResponse> {
-		return this.sendEcp(path, params, body, options);
+	public sendEcpPost(path: string, params = {}, options: HttpRequestOptions = {}): Promise<EcpResponse> {
+		return this.sendEcp(path, params, 'POST', options);
 	}
 
-	public sendEcpGet(path: string, params = {}, options: HttpRequestOptions = {}): Promise<needle.NeedleResponse> {
-		return this.sendEcp(path, params, undefined, options);
+	public sendEcpGet(path: string, params = {}, options: HttpRequestOptions = {}): Promise<EcpResponse> {
+		return this.sendEcp(path, params, 'GET', options);
 	}
 
-	private async sendEcp(path: string, params = {}, body?: needle.BodyData, options: HttpRequestOptions = {}): Promise<needle.NeedleResponse> {
-		let url = `http://${this.getCurrentDeviceConfig().host}:8060/${path}`;
+	public sendKeyPress(key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		return this.sendKeyEventToRokuDeploy('keyPress', key, options);
+	}
+
+	public sendKeyDown(key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		return this.sendKeyEventToRokuDeploy('keyDown', key, options);
+	}
+
+	public sendKeyUp(key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		return this.sendKeyEventToRokuDeploy('keyUp', key, options);
+	}
+
+	// roku-deploy sends the key text as-is (no retry, uri-encoding handled internally); RTA just retries here
+	private async sendKeyEventToRokuDeploy(rokuDeployMethod: 'keyPress' | 'keyDown' | 'keyUp', key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
+		let retryCount = options.retryCount;
+		if (retryCount === undefined) {
+			retryCount = 3;
+		}
+
+		try {
+			return await rokuDeploy[rokuDeployMethod]({ device: this.getRokuDeployDevice(), key });
+		} catch (e) {
+			if ((retryCount - 1) > 0) {
+				this.debugLog(`${rokuDeployMethod} request for key ${key} failed. Retrying.`);
+				// Want to delay retry slightly
+				await utils.sleep(50);
+				return this.sendKeyEventToRokuDeploy(rokuDeployMethod, key, { ...options, retryCount: retryCount - 1 });
+			}
+			throw utils.makeError('sendKeyEventError', `${rokuDeployMethod} request for key ${key} failed and no retries left`);
+		}
+	}
+
+	private async sendEcp(path: string, params = {}, method: 'GET' | 'POST', options: HttpRequestOptions = {}): Promise<EcpResponse> {
+		let route = path;
 		let retryCount = options.retryCount;
 		if (retryCount === undefined) {
 			retryCount = 3;
 		}
 
 		if (params && Object.keys(params).length) {
-			url = url.replace(/\?.*|$/, '?' + querystring.build(params));
+			route = `${path}?${querystring.stringify(params)}`;
 		}
 
+		let result: EcpResult;
 		try {
-			if (body !== undefined) {
-				return await this.needle('post', url, body, this.getNeedleOptions());
-			} else {
-				return await this.needle('get', url, this.getNeedleOptions());
-			}
+			result = await rokuDeploy.sendEcpRequest(this.getRokuDeployDevice(), route, { method: method });
 		} catch (e) {
 			if ((retryCount - 1) > 0) {
-				this.debugLog(`ECP request to ${url} failed. Retrying.`);
+				this.debugLog(`ECP request to ${route} failed. Retrying.`);
 				// Want to delay retry slightly
 				await utils.sleep(50);
-				return this.sendEcp(path, params, body, {...options, retryCount: retryCount - 1});
+				return this.sendEcp(path, params, method, {...options, retryCount: retryCount - 1});
 			}
+			throw utils.makeError('sendEcpError', `ECP request to ${route} failed and no retries left`);
 		}
-		throw utils.makeError('sendEcpError', `ECP request to ${url} failed and no retries left`);
+
+		//parse outside the try so a malformed response body does not trigger transport retries
+		return {
+			status: result.status,
+			headers: result.headers,
+			body: parseEcpResponse(result)
+		};
 	}
 
 	/**
-	 * @param outputFilePath - Where to output the generated screenshot. Extension is automatically appended based on what type of screenshotFormat you have specified for this device
+	 * @param outputFilePath - Where to save the screenshot; the device's image extension is appended automatically.
 	 */
 	public async getScreenshot(outputFilePath?: string) {
-		await this.generateScreenshot();
-		return await this.saveScreenshot(outputFilePath);
+		const result = await rokuDeploy.captureScreenshot({
+			device: this.getRokuDeployDevice(),
+			password: this.getCurrentDeviceConfig().password,
+			out: outputFilePath,
+			autoExtension: true
+		});
+		const format = result.filePath
+			? utils['getPath']().extname(result.filePath).slice(1)
+			: (result.buffer[0] === 0x89 ? 'png' : 'jpg');
+		return {
+			format: format,
+			buffer: result.buffer,
+			path: result.filePath
+		};
 	}
 
 	public async getTestScreenshot(contextOrSuite: mocha.Context | mocha.Suite, basePath = '', postFix = '', separator = '_') {
@@ -186,7 +245,7 @@ export class RokuDevice {
 
 	public async getTelnetLog() {
 		return new Promise<string>((resolve, reject) => {
-			const socket = net.createConnection(8085, this.getCurrentDeviceConfig().host);
+			const socket = createRokuDeploySocket({ device: this.getRokuDeployDevice(), port: 8085 });
 
 			let content = '';
 			let timeout;
@@ -214,6 +273,8 @@ export class RokuDevice {
 				reject(e);
 				socket.destroy();
 			});
+
+			socket.connect();
 		});
 	}
 
@@ -226,87 +287,7 @@ export class RokuDevice {
 				break;
 			}
 		}
-		return `Telnet output from ${this.getCurrentDeviceConfig().host}\n` + splitContents.join('\n');
-	}
-
-	private async generateScreenshot() {
-		const url = `http://${this.getCurrentDeviceConfig().host}/plugin_inspect`;
-		const formData = {
-			archive: '',
-			mysubmit: 'Screenshot'
-		};
-		const options = this.getNeedleOptions(true);
-
-		const requestOptions = {
-			url: url,
-			auth: {
-				user: options.username,
-				pass: options.password,
-				sendImmediately: false
-			},
-			formData: formData,
-			agentOptions: { 'keepAlive': false }
-		};
-
-		return await new Promise((resolve, reject) => {
-			request.post(requestOptions, (err, resp, body) => {
-				if (err) {
-					return reject(err);
-				}
-				return resolve({ response: resp, body: body });
-			});
-		});
-	}
-
-	private async saveScreenshot(outputFilePath?: string) {
-		const deviceConfig = this.getCurrentDeviceConfig();
-		const options = this.getNeedleOptions(true);
-
-		let ext = deviceConfig.screenshotFormat ?? 'jpg';
-		if (outputFilePath) {
-			await utils.ensureDirExistForFilePath(outputFilePath);
-			options.output = `${outputFilePath}.${ext}`;
-		}
-
-		let url = `http://${deviceConfig.host}/pkgs/dev.${ext}`;
-		let result = await this.needle('get', url, options);
-		if (result.statusCode === 401) {
-			throw new Error(`Could not download screenshot at ${url}. Make sure you have the correct device password`);
-		} else if (result.statusCode === 404) {
-			if (ext === 'jpg') {
-				ext = 'png';
-			} else {
-				ext = 'jpg';
-			}
-			url = `http://${deviceConfig.host}/pkgs/dev.${ext}`;
-			result = await this.needle('get', url, options);
-			if (result.statusCode === 200) {
-				console.log(`Device ${deviceConfig.host} screenshot format was ${deviceConfig.screenshotFormat}. Temporarily updating to ${ext}. Consider updating your config.`);
-				deviceConfig.screenshotFormat = ext;
-			}
-		}
-
-		if (result.statusCode !== 200) {
-			throw new Error(`Could not download screenshot at ${url}. Make sure your sideloaded application is open`);
-		}
-
-		return {
-			format: deviceConfig.screenshotFormat,
-			buffer: result.body as Buffer,
-			path: options.output
-		};
-	}
-
-	private getNeedleOptions(requiresAuth = false) {
-		const options: needle.NeedleOptions = {};
-		if (requiresAuth) {
-			options.username = 'rokudev';
-			options.password = this.getCurrentDeviceConfig().password;
-			options.auth = 'digest';
-		}
-
-		options.proxy = this.getConfig().proxy;
-		return options;
+		return `Telnet output from ${utils.getDeviceLabel(this.getRokuDeployDevice())}\n` + splitContents.join('\n');
 	}
 
 	private debugLog(message: string, ...args) {
@@ -315,3 +296,29 @@ export class RokuDevice {
 		}
 	}
 }
+
+export interface EcpResponse {
+	/** The http status code of the response, or undefined when the transport produced no response */
+	status: number | undefined;
+	/** The response headers (lowercased names) */
+	headers: Record<string, string | string[]>;
+	/** The response body, parsed by content-type: an element tree for xml, an object for json, otherwise the raw string */
+	body: any;
+}
+
+export interface BeforeZipCallbackInfo {
+	/** The staging directory holding the copied files before they are zipped, so callers can modify them */
+	stagingDir: string;
+}
+
+export type CreatePackageOptions = RokuDeployOptions & {
+	/** Inject the RTA testing files into the package. Defaults to true */
+	injectTestingFiles?: boolean;
+};
+
+export type DeployOptions = CreatePackageOptions & {
+	preventMultipleDeployments?: boolean;
+	/** Delete the currently installed dev channel before installing */
+	deleteInstalledChannel?: boolean;
+	deleteBeforeInstall?: boolean; // Remove in v3
+};

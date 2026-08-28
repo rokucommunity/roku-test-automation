@@ -54,7 +54,8 @@ sub runTaskThread()
 	setValidRequestTypes()
 
 	address = createObject("roSocketAddress")
-	address.setPort(9000)
+	' TESTING: was 9000; RCE instances only proxy whitelisted ports plus the ephemeral range 49152-65535. Must match OnDeviceComponent.ts
+	address.setPort(50000)
 
 	m.listenSocket = createObject("roStreamSocket")
 	m.listenSocketId = m.listenSocket.getID().toStr()

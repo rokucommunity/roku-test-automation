@@ -15,7 +15,8 @@ describe('NetworkProxy', function () {
 	let serverReceivedRequest: any;
 	let proxyPort: number;
 
-	before(async () => {
+	before(async function () {
+		this.timeout(120_000);
 		setupTestEnvironment();
 		await device.deploy({
 			rootDir: 'testProject',

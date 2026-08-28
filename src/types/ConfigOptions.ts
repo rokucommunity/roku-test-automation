@@ -1,3 +1,4 @@
+import type { DeviceConfig } from 'roku-deploy';
 import type * as ODC from './OnDeviceComponent';
 
 export interface ConfigOptions {
@@ -14,6 +15,9 @@ export interface ConfigOptions {
 	OnDeviceComponent?: OnDeviceComponentConfigOptions;
 
 	NetworkProxy?: NetworkProxyOptions;
+
+	/** Shared Roku Cloud Emulator api token applied to any device entry that doesn't define its own. The `ROKU_RCE_TOKEN` environment variable is the final fallback. */
+	rceToken?: string;
 }
 
 export interface RokuDeviceConfigOptions {
@@ -25,14 +29,14 @@ export interface RokuDeviceConfigOptions {
 	/** zero based index of which `devices` index to use. If not provided defaults to 0 */
 	deviceIndex?: number;
 
-	/** Useful for debugging port 80 and ECP communication between Roku and client. Use in the format like (127.0.0.1:8888). */
+	/**
+	 * Formerly routed RTA's port 80 and ECP requests through a debugging proxy like (127.0.0.1:8888).
+	 * @deprecated No longer functional: device HTTP now goes through roku-deploy, which has no proxy support. Use the NetworkProxy class to inspect device-originated traffic.
+	 */
 	proxy?: string;
 }
 
-export interface DeviceConfigOptions {
-	/** The IP address or hostname of the target Roku device. */
-	host: string;
-
+export type DeviceConfigOptions = DeviceConfig & {
 	/** The password for logging in to the developer portal on the target Roku device */
 	password: string;
 
