@@ -7,7 +7,6 @@ import * as dotenv from 'dotenv';
 
 import { utils } from '../utils';
 import { RokuDevice } from '../RokuDevice';
-import { device } from '../index';
 
 const repoRootDir = path.resolve(__dirname, '../../');
 
@@ -55,6 +54,20 @@ export function setupTestEnvironment() {
 }
 
 /**
+ * A RokuDevice used only by the device-health helpers below. Deliberately constructed here rather
+ * than imported from `../index`: importing the barrel pulls the whole library (OnDeviceComponent,
+ * NetworkProxy, etc) into the unit test run, which drags all of it into the nyc coverage report even
+ * though the unit tests don't exercise it. Created lazily so it reads config after setupTestEnvironment.
+ */
+let healthCheckDevice: RokuDevice | undefined;
+function getHealthCheckDevice() {
+	if (!healthCheckDevice) {
+		healthCheckDevice = new RokuDevice();
+	}
+	return healthCheckDevice;
+}
+
+/**
  * Wait for the device to be reachable and responsive by polling both ECP (device-info) and the
  * installer web server (the same `plugin_install` endpoint sideload/publish use) until both respond.
  *
@@ -67,8 +80,9 @@ export function setupTestEnvironment() {
 export async function waitForDeviceOnline(timeoutMs = 120_000, intervalMs = 3000, graceMs = 0): Promise<void> {
 	const startTime = Date.now();
 	const deadline = startTime + timeoutMs;
-	const rokuDeployDevice = device.getRokuDeployDevice();
-	const password = device.getCurrentDeviceConfig().password;
+	const healthDevice = getHealthCheckDevice();
+	const rokuDeployDevice = healthDevice.getRokuDeployDevice();
+	const password = healthDevice.getCurrentDeviceConfig().password;
 
 	if (graceMs > 0) {
 		await utils.sleep(graceMs);
@@ -107,9 +121,10 @@ export async function waitForDeviceOnline(timeoutMs = 120_000, intervalMs = 3000
  * a known state instead of whatever the previous test left on screen.
  */
 export async function pressHomeButton(): Promise<void> {
-	await device.sendKeyPress('Home');
+	const healthDevice = getHealthCheckDevice();
+	await healthDevice.sendKeyPress('Home');
 	await utils.sleep(100);
-	await device.sendKeyPress('Home');
+	await healthDevice.sendKeyPress('Home');
 	await utils.sleep(100);
 }
 
