@@ -9,19 +9,29 @@ import * as assert from 'assert';
 import { utils } from './utils';
 import type * as ODC from './types/OnDeviceComponent';
 import { ecp, odc, device } from '.';
-import { setupTestEnvironment } from './test/testHelpers.spec';
+import { setupTestEnvironment, ensureDeviceIsReady, ensureDeviceIsStillResponsive } from './test/testHelpers.spec';
 
 // Used to unwrap promise return types to get the true value
 type Unwrap<T> = T extends Promise<infer U> ? U : T extends (...args: any) => Promise<infer U> ? U : T extends (...args: any) => infer U ? U : T;
 
 describe('OnDeviceComponent', function () {
 	before(async function () {
-		this.timeout(120_000);
+		this.timeout(240_000);
 		setupTestEnvironment();
+		//make sure the device is actually reachable and responsive, and back at the home screen, before
+		//we deploy. Otherwise a device that's still booting fails the whole suite in `before`.
+		await ensureDeviceIsReady();
 		await device.deploy({
 			rootDir: 'testProject',
 			preventMultipleDeployments: true
 		});
+	});
+
+	beforeEach(async function () {
+		//make sure the device is still reachable before running the next test, so a wedged device fails
+		//here with a clear message rather than midway through a test
+		this.timeout(120_000);
+		await ensureDeviceIsStillResponsive();
 	});
 
 	after(async () => {

@@ -1,4 +1,5 @@
 import * as fsExtra from 'fs-extra';
+import { rokuDeploy } from 'roku-deploy';
 import type { EcpResponse } from '../RokuDevice';
 import { parseEcpResponse } from '../EcpXml';
 import * as path from 'path';
@@ -50,6 +51,104 @@ export function setupTestEnvironment() {
 	utils.setupEnvironmentFromConfig(config);
 
 	return config;
+}
+
+/**
+ * A RokuDevice used only by the device-health helpers below. Deliberately constructed here rather
+ * than imported from `../index`: importing the barrel pulls the whole library (OnDeviceComponent,
+ * NetworkProxy, etc) into the unit test run, which drags all of it into the nyc coverage report even
+ * though the unit tests don't exercise it. Created lazily so it reads config after setupTestEnvironment.
+ */
+let healthCheckDevice: RokuDevice | undefined;
+function getHealthCheckDevice() {
+	if (!healthCheckDevice) {
+		healthCheckDevice = new RokuDevice();
+	}
+	return healthCheckDevice;
+}
+
+/**
+ * Wait for the device to be reachable and responsive by polling both ECP (device-info) and the
+ * installer web server (the same `plugin_install` endpoint sideload/publish use) until both respond.
+ *
+ * ECP alone isn't enough: it can come back before the installer server has finished settling, which
+ * shows up as flaky sideload failures even though an ECP check had just reported the device online.
+ *
+ * @param graceMs how long to wait before the first poll. Use a non-zero value after issuing something
+ *   that reboots the device, so we don't immediately see the still-alive pre-reboot device.
+ */
+export async function waitForDeviceOnline(timeoutMs = 120_000, intervalMs = 3000, graceMs = 0): Promise<void> {
+	const startTime = Date.now();
+	const deadline = startTime + timeoutMs;
+	const healthDevice = getHealthCheckDevice();
+	const rokuDeployDevice = healthDevice.getRokuDeployDevice();
+	const password = healthDevice.getCurrentDeviceConfig().password;
+
+	if (graceMs > 0) {
+		await utils.sleep(graceMs);
+	}
+
+	let lastError: Error | undefined;
+	let count = 0;
+	while (Date.now() < deadline) {
+		if (count++ > 0) {
+			console.log(`[device-health] waiting for device to come online (${Date.now() - startTime}ms elapsed)`);
+		}
+		try {
+			//ensure the ECP webserver is responsive
+			await rokuDeploy.getDeviceInfo({ device: rokuDeployDevice, timeout: intervalMs });
+			//ensure the plugin_install webserver is responsive
+			await rokuDeploy.listSideloadedPlugins({ device: rokuDeployDevice, password: password, timeout: intervalMs });
+
+			//some devices are not fully ready to speak yet, so if this was the result of a long wait,
+			//wait a little bit longer
+			if (count > 1) {
+				console.log('[device-health] device is online, waiting a few more seconds to ensure it is fully ready...');
+				await utils.sleep(5_000);
+				console.log(`[device-health] device is online after ${Date.now() - startTime}ms`);
+			}
+			return;
+		} catch (e) {
+			lastError = e as Error;
+			await utils.sleep(intervalMs);
+		}
+	}
+	throw new Error(`Device did not come online within ${timeoutMs}ms. Last error: ${lastError?.message}`);
+}
+
+/**
+ * Send a couple of Home presses to clear any foreground app/screensaver, so the next test starts from
+ * a known state instead of whatever the previous test left on screen.
+ */
+export async function pressHomeButton(): Promise<void> {
+	const healthDevice = getHealthCheckDevice();
+	await healthDevice.sendKeyPress('Home');
+	await utils.sleep(100);
+	await healthDevice.sendKeyPress('Home');
+	await utils.sleep(100);
+}
+
+/**
+ * Suite-level device health gate: make sure the device is actually reachable and responsive, then
+ * return it to the home screen so the suite starts from a known state instead of whatever the
+ * previous suite left running. Call this from a `before` hook, ahead of any deploy/launch.
+ */
+export async function ensureDeviceIsReady(): Promise<void> {
+	await waitForDeviceOnline(90_000, 2000, 0);
+	await pressHomeButton();
+}
+
+/**
+ * Per-test device health gate: make sure the device is still reachable and responsive before the next
+ * test runs, so a device that's wedged or still coming back online fails here with a clear message
+ * instead of surfacing as a confusing failure midway through the test itself.
+ *
+ * Deliberately does NOT press Home the way the suite-level gate does. Suites that deploy once in
+ * `before` and then drive the channel over the ODC socket would have the channel exited out from
+ * under them by a per-test Home press.
+ */
+export async function ensureDeviceIsStillResponsive(): Promise<void> {
+	await waitForDeviceOnline(90_000, 2000, 0);
 }
 
 /**

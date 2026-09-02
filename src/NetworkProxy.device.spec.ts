@@ -7,7 +7,7 @@ import * as express from 'express';
 
 import { utils } from './utils';
 import { ecp, odc, device, proxy } from '.';
-import { setupTestEnvironment } from './test/testHelpers.spec';
+import { setupTestEnvironment, ensureDeviceIsReady, ensureDeviceIsStillResponsive } from './test/testHelpers.spec';
 
 describe('NetworkProxy', function () {
 	let testServer: http.Server;
@@ -16,8 +16,11 @@ describe('NetworkProxy', function () {
 	let proxyPort: number;
 
 	before(async function () {
-		this.timeout(120_000);
+		this.timeout(240_000);
 		setupTestEnvironment();
+		//make sure the device is actually reachable and responsive, and back at the home screen, before
+		//we deploy. Otherwise a device that's still booting fails the whole suite in `before`.
+		await ensureDeviceIsReady();
 		await device.deploy({
 			rootDir: 'testProject',
 			preventMultipleDeployments: true
@@ -47,6 +50,13 @@ describe('NetworkProxy', function () {
 		await Promise.all([promise, proxy.start(proxyPort)]);
 	});
 
+
+	beforeEach(async function () {
+		//make sure the device is still reachable before running the next test, so a wedged device fails
+		//here with a clear message rather than midway through a test
+		this.timeout(120_000);
+		await ensureDeviceIsStillResponsive();
+	});
 
 	after(async () => {
 		await proxy.stop();
