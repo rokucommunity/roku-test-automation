@@ -7,7 +7,7 @@ import * as express from 'express';
 
 import { utils } from './utils';
 import { ecp, odc, device, proxy } from '.';
-import { setupTestEnvironment, ensureDeviceIsReady } from './test/testHelpers.spec';
+import { setupTestEnvironment, ensureDeviceIsReady, ensureDeviceIsStillResponsive } from './test/testHelpers.spec';
 
 describe('NetworkProxy', function () {
 	let testServer: http.Server;
@@ -50,6 +50,13 @@ describe('NetworkProxy', function () {
 		await Promise.all([promise, proxy.start(proxyPort)]);
 	});
 
+
+	beforeEach(async function () {
+		//make sure the device is still reachable before running the next test, so a wedged device fails
+		//here with a clear message rather than midway through a test
+		this.timeout(120_000);
+		await ensureDeviceIsStillResponsive();
+	});
 
 	after(async () => {
 		await proxy.stop();

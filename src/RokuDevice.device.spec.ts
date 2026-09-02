@@ -7,7 +7,7 @@ const expect = chai.expect;
 import * as querystring from 'querystring';
 import { rokuDeploy } from 'roku-deploy';
 import { ecp, device } from './';
-import { setupTestEnvironment, ensureDeviceIsReady } from './test/testHelpers.spec';
+import { setupTestEnvironment, ensureDeviceIsReady, ensureDeviceIsStillResponsive } from './test/testHelpers.spec';
 
 describe('RokuDevice', function () {
 	before(async function () {
@@ -18,6 +18,13 @@ describe('RokuDevice', function () {
 		//we launch anything. Otherwise a device that's still booting fails the whole suite in `before`.
 		await ensureDeviceIsReady();
 		await ecp.sendLaunchChannel();
+	});
+
+	beforeEach(async function () {
+		//make sure the device is still reachable before running the next test, so a wedged device fails
+		//here with a clear message rather than midway through a test
+		this.timeout(120_000);
+		await ensureDeviceIsStillResponsive();
 	});
 
 	afterEach(() => {

@@ -114,12 +114,26 @@ export async function pressHomeButton(): Promise<void> {
 }
 
 /**
- * Standard per-test device health gate: make sure the device is actually reachable and responsive,
- * then return it to the home screen. Call this from a `beforeEach` in device suites.
+ * Suite-level device health gate: make sure the device is actually reachable and responsive, then
+ * return it to the home screen so the suite starts from a known state instead of whatever the
+ * previous suite left running. Call this from a `before` hook, ahead of any deploy/launch.
  */
 export async function ensureDeviceIsReady(): Promise<void> {
 	await waitForDeviceOnline(90_000, 2000, 0);
 	await pressHomeButton();
+}
+
+/**
+ * Per-test device health gate: make sure the device is still reachable and responsive before the next
+ * test runs, so a device that's wedged or still coming back online fails here with a clear message
+ * instead of surfacing as a confusing failure midway through the test itself.
+ *
+ * Deliberately does NOT press Home the way the suite-level gate does. Suites that deploy once in
+ * `before` and then drive the channel over the ODC socket would have the channel exited out from
+ * under them by a per-test Home press.
+ */
+export async function ensureDeviceIsStillResponsive(): Promise<void> {
+	await waitForDeviceOnline(90_000, 2000, 0);
 }
 
 /**
