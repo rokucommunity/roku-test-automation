@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.0-alpha.2](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.1...v3.0.0-alpha.2) - 2026-09-02
+### Changed
+ - chore: Add device health checks to on-device test suites ([#184](https://github.com/rokucommunity/roku-test-automation/pull/184))
+ - chore: Fix bslint config resolution in the language server, bump brighterscript to 0.73.0 ([#182](https://github.com/rokucommunity/roku-test-automation/pull/182))
+ - Security enhancements ([#183](https://github.com/rokucommunity/roku-test-automation/pull/183))
+ - upgrade to [brighterscript@0.73.1](https://github.com/rokucommunity/brighterscript/blob/master/CHANGELOG.md#0731---2026-09-02). Notable changes since 0.72.5:
+
+
+
 ## [3.0.0-alpha.1](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.0...v3.0.0-alpha.1) - 2026-08-28
 ### Added
  - Roku Cloud Emulator (RCE) device support ([#177](https://github.com/rokucommunity/roku-test-automation/pull/177))

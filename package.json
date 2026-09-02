@@ -1,6 +1,6 @@
 {
     "name": "roku-test-automation",
-    "version": "3.0.0-alpha.1",
+    "version": "3.0.0-alpha.2",
     "description": "Helps with automating functional tests",
     "main": "dist/index.js",
     "typings": "dist/index.d.ts",
@@ -59,7 +59,7 @@
         "@typescript-eslint/eslint-plugin": "^5.22.0",
         "@typescript-eslint/parser": "^5.22.0",
         "audit-ci": "^7.1.0",
-        "brighterscript": "^0.73.0",
+        "brighterscript": "^0.73.1",
         "chai": "^4.3.4",
         "chai-arrays": "^2.2.0",
         "dotenv": "^17.4.2",
