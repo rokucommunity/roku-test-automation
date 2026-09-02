@@ -7,7 +7,7 @@ import * as express from 'express';
 
 import { utils } from './utils';
 import { ecp, odc, device, proxy } from '.';
-import { setupTestEnvironment } from './test/testHelpers.spec';
+import { setupTestEnvironment, ensureDeviceIsReady } from './test/testHelpers.spec';
 
 describe('NetworkProxy', function () {
 	let testServer: http.Server;
@@ -16,8 +16,11 @@ describe('NetworkProxy', function () {
 	let proxyPort: number;
 
 	before(async function () {
-		this.timeout(120_000);
+		this.timeout(240_000);
 		setupTestEnvironment();
+		//make sure the device is actually reachable and responsive, and back at the home screen, before
+		//we deploy. Otherwise a device that's still booting fails the whole suite in `before`.
+		await ensureDeviceIsReady();
 		await device.deploy({
 			rootDir: 'testProject',
 			preventMultipleDeployments: true

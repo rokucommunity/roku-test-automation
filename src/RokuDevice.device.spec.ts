@@ -7,13 +7,16 @@ const expect = chai.expect;
 import * as querystring from 'querystring';
 import { rokuDeploy } from 'roku-deploy';
 import { ecp, device } from './';
-import { setupTestEnvironment } from './test/testHelpers.spec';
+import { setupTestEnvironment, ensureDeviceIsReady } from './test/testHelpers.spec';
 
 describe('RokuDevice', function () {
 	before(async function () {
-		//launching the channel and waiting for it to become active takes well over the default 10s timeout
-		this.timeout(120_000);
+		//waiting for the device to be online plus launching the channel takes well over the default 10s timeout
+		this.timeout(240_000);
 		setupTestEnvironment();
+		//make sure the device is actually reachable and responsive, and back at the home screen, before
+		//we launch anything. Otherwise a device that's still booting fails the whole suite in `before`.
+		await ensureDeviceIsReady();
 		await ecp.sendLaunchChannel();
 	});
 
