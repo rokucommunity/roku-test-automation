@@ -77,7 +77,7 @@
         "serialize-javascript": "^7.0.5",
         "brace-expansion": "^2.1.4",
         "js-yaml": "^4.3.1",
-        "qs": "^6.15.3",
+        "qs": "^6.16.0",
         "uuid": "^11.1.1",
         "browserslist": "^4.28.8"
     },
