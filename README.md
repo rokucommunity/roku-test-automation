@@ -33,6 +33,7 @@
     - [`deleteRegistrySections`](#deleteregistrysections)
     - [`deleteEntireRegistry`](#deleteentireregistry)
   - [`RokuDevice`](#rokudevice)
+    - [`waitForDeviceOnline`](#waitfordeviceonline)
   - [`NetworkProxy`](#networkproxy)
   - [`utils`](#utils)
     - [`setupEnvironmentFromConfigFile`](#setupenvironmentfromconfigfile)
@@ -737,6 +738,23 @@ Allows for disabling the screen saver in the application. While the screen saver
 ### `RokuDevice`
 
 Serves as the middle man for ECP requests and provides access to some of the capabilities provided by the Roku's built in web server. Currently creates and retrieves a screenshot as well as provides a helper for deploying.
+
+#### `waitForDeviceOnline`
+
+> waitForDeviceOnline(timeoutMs: number = 120000, intervalMs: number = 3000, graceMs: number = 0): Promise\<void>
+
+Waits for the device to be reachable and responsive before continuing. It polls both the ECP web server (`device-info`) and the installer web server (the same `plugin_install` endpoint sideload/publish use), since ECP can come back online before the installer server has finished settling. This makes it a useful health gate before deploying or launching, especially after a reboot.
+
+- `timeoutMs` how long to keep polling before giving up
+- `intervalMs` delay between poll attempts (also used as the per-request timeout)
+- `graceMs` how long to wait before the first poll. Use a non-zero value after issuing something that reboots the device, so we don't immediately see the still-alive pre-reboot device.
+
+```ts
+import { device } from 'roku-test-automation';
+
+// wait up to 90s, polling every 2s, after a 5s grace period (e.g. following a reboot)
+await device.waitForDeviceOnline(90_000, 2000, 5_000);
+```
 
 ---
 
