@@ -166,6 +166,56 @@ export class RokuDevice {
 		return this.sendKeyEventToRokuDeploy('keyUp', key, options);
 	}
 
+	/**
+	 * Wait for the device to be reachable and responsive by polling both ECP (device-info) and the
+	 * installer web server (the same `plugin_install` endpoint sideload/publish use) until both respond.
+	 *
+	 * ECP alone isn't enough: it can come back before the installer server has finished settling, which
+	 * shows up as flaky sideload failures even though an ECP check had just reported the device online.
+	 *
+	 * @param timeoutMs how long to keep polling before giving up
+	 * @param intervalMs delay between poll attempts (also used as the per-request timeout)
+	 * @param graceMs how long to wait before the first poll. Use a non-zero value after issuing something
+	 *   that reboots the device, so we don't immediately see the still-alive pre-reboot device.
+	 */
+	public async waitForDeviceOnline(timeoutMs = 120_000, intervalMs = 3000, graceMs = 0): Promise<void> {
+		const startTime = Date.now();
+		const deadline = startTime + timeoutMs;
+		const rokuDeployDevice = this.getRokuDeployDevice();
+		const password = this.getCurrentDeviceConfig().password;
+
+		if (graceMs > 0) {
+			await utils.sleep(graceMs);
+		}
+
+		let lastError: Error | undefined;
+		let count = 0;
+		while (Date.now() < deadline) {
+			if (count++ > 0) {
+				console.log(`[device-health] waiting for device to come online (${Date.now() - startTime}ms elapsed)`);
+			}
+			try {
+				//ensure the ECP webserver is responsive
+				await rokuDeploy.getDeviceInfo({ device: rokuDeployDevice, timeout: intervalMs });
+				//ensure the plugin_install webserver is responsive
+				await rokuDeploy.listSideloadedPlugins({ device: rokuDeployDevice, password: password, timeout: intervalMs });
+
+				//some devices are not fully ready to speak yet, so if this was the result of a long wait,
+				//wait a little bit longer
+				if (count > 1) {
+					console.log('[device-health] device is online, waiting a few more seconds to ensure it is fully ready...');
+					await utils.sleep(5_000);
+					console.log(`[device-health] device is online after ${Date.now() - startTime}ms`);
+				}
+				return;
+			} catch (e) {
+				lastError = e as Error;
+				await utils.sleep(intervalMs);
+			}
+		}
+		throw new Error(`Device did not come online within ${timeoutMs}ms. Last error: ${lastError?.message}`);
+	}
+
 	// roku-deploy sends the key text as-is (no retry, uri-encoding handled internally); RTA just retries here
 	private async sendKeyEventToRokuDeploy(rokuDeployMethod: 'keyPress' | 'keyDown' | 'keyUp', key: string, options: HttpRequestOptions = {}): Promise<EcpResult> {
 		let retryCount = options.retryCount;
