@@ -46,7 +46,7 @@
         "stoppable": "^1.1.0"
     },
     "devDependencies": {
-        "@rokucommunity/bslint": "^0.8.45",
+        "@rokucommunity/bslint": "^0.8.46",
         "@types/chai": "^4.3.0",
         "@types/chai-arrays": "^2.0.0",
         "@types/fs-extra": "^5.0.1",
