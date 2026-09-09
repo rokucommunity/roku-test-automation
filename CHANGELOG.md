@@ -6,6 +6,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.0-alpha.3](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.2...v3.0.0-alpha.3) - 2026-09-09
+### Added
+ - Add `waitForDeviceOnline` method to `RokuDevice` class ([#187](https://github.com/rokucommunity/roku-test-automation/pull/187))
+### Changed
+ - Security enhancements ([#186](https://github.com/rokucommunity/roku-test-automation/pull/186), [#188](https://github.com/rokucommunity/roku-test-automation/pull/188))
+ - upgrade to [roku-deploy@4.0.0-alpha.6](https://github.com/rokucommunity/roku-deploy/blob/master/CHANGELOG.md#400-alpha6---2026-09-08). Notable changes since 4.0.0-alpha.5:
+     - Migrate RCE routes to /api/v0/input and the 8060 port proxy ([#396](https://github.com/rokucommunity/roku-deploy/pull/396))
+     - Support top-level patterns to external dirs using globstar ([#394](https://github.com/rokucommunity/roku-deploy/pull/394))
+     - Rename getFilePaths to resolveFilesArray ([#393](https://github.com/rokucommunity/roku-deploy/pull/393))
+     - Add rce startDevice/stopDevice CLI commands ([#372](https://github.com/rokucommunity/roku-deploy/pull/372))
+     - Replace postman-request shims and fetch ([#390](https://github.com/rokucommunity/roku-deploy/pull/390))
+     - Align on camelCase convention ([#369](https://github.com/rokucommunity/roku-deploy/pull/369))
+     - Validate device configs specify exactly one targeting identifier ([#388](https://github.com/rokucommunity/roku-deploy/pull/388))
+     - Remove all @deprecated items ([#389](https://github.com/rokucommunity/roku-deploy/pull/389))
+     - Refine comments ([#371](https://github.com/rokucommunity/roku-deploy/pull/371))
+     - Rename query* ECP methods to get* ([#385](https://github.com/rokucommunity/roku-deploy/pull/385))
+     - Add format property to CaptureScreenshotResult ([#386](https://github.com/rokucommunity/roku-deploy/pull/386))
+ - upgrade to [@rokucommunity/bslint@0.8.45](https://github.com/rokucommunity/bslint/blob/master/CHANGELOG.md#0845---2026-09-02). Notable changes since 0.8.44:
+     - fix: restrict CreateObject component usage detection ([#197](https://github.com/rokucommunity/bslint/pull/197))
+     - Security enhancements ([#196](https://github.com/rokucommunity/bslint/pull/196), [#198](https://github.com/rokucommunity/bslint/pull/198))
+ - upgrade to [brighterscript@0.73.3](https://github.com/rokucommunity/brighterscript/blob/master/CHANGELOG.md#0733---2026-09-09). Notable changes since 0.73.1:
+     - Modifies default max worker thread logic to be only as much as memory allows ([#1798](https://github.com/rokucommunity/brighterscript/pull/1798))
+     - Security enhancements ([#1796](https://github.com/rokucommunity/brighterscript/pull/1796))
+     - Transpile continue down for firmware below 11.5 ([#489](https://github.com/rokucommunity/brighterscript/pull/489))
+     - Better error message for wrong-cased XML tags ([#1793](https://github.com/rokucommunity/brighterscript/pull/1793))
+     - Add `isTerminal` and `previousInChain` getters to AstNode ([#1788](https://github.com/rokucommunity/brighterscript/pull/1788))
+     - Add generic go-to-definition for file path strings in BRS/BS/XML files ([#1648](https://github.com/rokucommunity/brighterscript/pull/1648))
+     - Fix duplicate and crashing "find all references" results ([#1791](https://github.com/rokucommunity/brighterscript/pull/1791))
+     - Fix nested curly braces in template strings ([#1539](https://github.com/rokucommunity/brighterscript/pull/1539))
+     - Recognize regex literals after `${` and `,` ([#1789](https://github.com/rokucommunity/brighterscript/pull/1789))
+     - Infer node type from findAncestor type-guard matchers ([#1787](https://github.com/rokucommunity/brighterscript/pull/1787))
+     - Enable @typescript-eslint/no-unsafe-argument ([#1785](https://github.com/rokucommunity/brighterscript/pull/1785))
+     - Avoid emitting a duplicate sourceMappingURL comment ([#1786](https://github.com/rokucommunity/brighterscript/pull/1786))
+     - Reduce per-Token lexer allocation to cut GC pressure while editing ([#1712](https://github.com/rokucommunity/brighterscript/pull/1712))
+
+
+
 ## [3.0.0-alpha.2](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.1...v3.0.0-alpha.2) - 2026-09-02
 ### Changed
  - chore: Add device health checks to on-device test suites ([#184](https://github.com/rokucommunity/roku-test-automation/pull/184))

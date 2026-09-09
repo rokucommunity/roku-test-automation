@@ -1,6 +1,6 @@
 {
     "name": "roku-test-automation",
-    "version": "3.0.0-alpha.2",
+    "version": "3.0.0-alpha.3",
     "description": "Helps with automating functional tests",
     "main": "dist/index.js",
     "typings": "dist/index.d.ts",
@@ -41,12 +41,12 @@
         "needle": "^2.9.1",
         "path": "^0.12.7",
         "portfinder": "^1.0.33",
-        "roku-deploy": "^4.0.0-alpha.5",
+        "roku-deploy": "^4.0.0-alpha.6",
         "sax": "^1.6.1",
         "stoppable": "^1.1.0"
     },
     "devDependencies": {
-        "@rokucommunity/bslint": "^0.8.44",
+        "@rokucommunity/bslint": "^0.8.45",
         "@types/chai": "^4.3.0",
         "@types/chai-arrays": "^2.0.0",
         "@types/fs-extra": "^5.0.1",
@@ -59,7 +59,7 @@
         "@typescript-eslint/eslint-plugin": "^5.22.0",
         "@typescript-eslint/parser": "^5.22.0",
         "audit-ci": "^7.1.0",
-        "brighterscript": "^0.73.1",
+        "brighterscript": "^0.73.3",
         "chai": "^4.3.4",
         "chai-arrays": "^2.2.0",
         "dotenv": "^17.4.2",
