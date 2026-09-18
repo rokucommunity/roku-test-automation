@@ -8,18 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.0.0-alpha.4](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.3...v3.0.0-alpha.4) - 2026-09-18
 ### Changed
- - Upgrade roku-deploy to 4.0.0-alpha.8 ([#191](https://github.com/rokucommunity/roku-test-automation/pull/191))
  - Security enhancements ([#190](https://github.com/rokucommunity/roku-test-automation/pull/190))
  - upgrade to [roku-deploy@4.0.0-alpha.8](https://github.com/rokucommunity/roku-deploy/blob/master/CHANGELOG.md#400-alpha8---2026-09-18). Notable changes since 4.0.0-alpha.6:
-     - Restore public API exports needed by downstream consumers ([#424](https://github.com/rokucommunity/roku-deploy/pull/424))
      - Security enhancements ([#422](https://github.com/rokucommunity/roku-deploy/pull/422))
-     - Add ECP websocket support and perfetto tracing wrappers ([#419](https://github.com/rokucommunity/roku-deploy/pull/419))
-     - Add sectioned rokudeploy.json config support ([#392](https://github.com/rokucommunity/roku-deploy/pull/392))
-     - Reduce Public Api Surface ([#360](https://github.com/rokucommunity/roku-deploy/pull/360))
-     - Remove dead RokuDeployOptions fields stagingDir and autoLaunch ([#412](https://github.com/rokucommunity/roku-deploy/pull/412))
      - sendEcpRequest: take a single options object ([#413](https://github.com/rokucommunity/roku-deploy/pull/413))
-     - Delete dead v3 type GetInstalledPackagesOptions ([#411](https://github.com/rokucommunity/roku-deploy/pull/411))
-     - chore: Fix device tests by increasing timeouts and detecting device reboots ([#400](https://github.com/rokucommunity/roku-deploy/pull/400))
 
 
 
