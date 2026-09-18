@@ -37,8 +37,8 @@ describe('RokuDevice', function () {
 		});
 
 		it('should work if params are passed in', async () => {
-			sinon.stub(rokuDeploy, 'sendEcpRequest').callsFake((deviceConfig, route) => {
-				expect(route).to.contain(querystring.stringify(params));
+			sinon.stub(rokuDeploy, 'sendEcpRequest').callsFake((requestOptions) => {
+				expect(requestOptions.route).to.contain(querystring.stringify(params));
 				return Promise.resolve({ status: 200, body: '', headers: {} });
 			});
 

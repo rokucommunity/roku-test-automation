@@ -249,7 +249,7 @@ export class RokuDevice {
 
 		let result: EcpResult;
 		try {
-			result = await rokuDeploy.sendEcpRequest(this.getRokuDeployDevice(), route, { method: method });
+			result = await rokuDeploy.sendEcpRequest({ device: this.getRokuDeployDevice(), route: route, method: method });
 		} catch (e) {
 			if ((retryCount - 1) > 0) {
 				this.debugLog(`ECP request to ${route} failed. Retrying.`);
