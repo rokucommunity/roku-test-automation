@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [3.0.0-alpha.4](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.3...v3.0.0-alpha.4) - 2026-09-18
+### Changed
+ - Security enhancements ([#190](https://github.com/rokucommunity/roku-test-automation/pull/190))
+ - upgrade to [roku-deploy@4.0.0-alpha.8](https://github.com/rokucommunity/roku-deploy/blob/master/CHANGELOG.md#400-alpha8---2026-09-18). Notable changes since 4.0.0-alpha.6:
+     - Security enhancements ([#422](https://github.com/rokucommunity/roku-deploy/pull/422))
+     - sendEcpRequest: take a single options object ([#413](https://github.com/rokucommunity/roku-deploy/pull/413))
+
+
+
 ## [3.0.0-alpha.3](https://github.com/rokucommunity/roku-test-automation/compare/3.0.0-alpha.2...v3.0.0-alpha.3) - 2026-09-09
 ### Added
  - Add `waitForDeviceOnline` method to `RokuDevice` class ([#187](https://github.com/rokucommunity/roku-test-automation/pull/187))
