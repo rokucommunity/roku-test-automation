@@ -238,7 +238,7 @@ end function
 
 function RTA_findChildNodeWithId(parentNode as Object, id as String, maxDepth = 10 as Integer, depth = 0 as Integer) as Dynamic
 	if depth > maxDepth then
-		RTA_logWarn(depth.toStr() + " exceeded maximum depth of " + maxDepth.toStr() + " searching for node with id '" + id + "'")
+		RTA_logDebug(depth.toStr() + " exceeded maximum depth of " + maxDepth.toStr() + " searching for node with id '" + id + "'")
 		return Invalid
 	end if
 
