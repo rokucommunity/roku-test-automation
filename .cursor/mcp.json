@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "roku-test-automation": {
+      "command": "./mcp/node_modules/.bin/tsx",
+      "args": ["./mcp/src/index.ts"]
+    }
+  }
+}
